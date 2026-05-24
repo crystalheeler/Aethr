@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
+
+try:
+    import fcntl
+except ImportError:  # Windows: fcntl is Unix-only
+    fcntl = None  # type: ignore[assignment]
+
 import os
 import platform
 import queue
@@ -33,6 +38,29 @@ from utils.sse import format_sse, sse_stream_fanout
 from utils.validation import validate_network_interface, validate_wifi_channel
 
 wifi_bp = Blueprint('wifi', __name__, url_prefix='/wifi')
+
+
+@wifi_bp.before_request
+def _gate_wifi_on_windows():
+    """WiFi scanning depends on monitor-mode-capable drivers (airmon-ng/iw/nmcli/
+    iwlist/airport). Windows has no equivalent — most consumer WiFi adapters
+    can't enter monitor mode on Windows at all. Block write endpoints with a
+    clean 503 so the dashboard surfaces a useful error instead of crashing
+    deep in subprocess code.
+    """
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "WiFi scanning / monitor mode",
+            "Windows WiFi drivers don't support monitor mode and the underlying "
+            "tools (airmon-ng, airodump-ng, iw, nmcli, iwlist) are Linux/macOS only.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # --- v1 deprecation ---
 # These endpoints are deprecated in favor of /wifi/v2/*.

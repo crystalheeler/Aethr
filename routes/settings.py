@@ -63,9 +63,11 @@ def _write_env_value(key: str, value: str, env_path: Path | None = None) -> None
 
         path.write_text('\n'.join(new_lines).rstrip('\n') + '\n')
 
+        # Restore ownership to the invoking sudo user on Linux/macOS so the file
+        # remains user-editable. Windows has no equivalent and skips this.
         sudo_uid = os.environ.get('INTERCEPT_SUDO_UID')
         sudo_gid = os.environ.get('INTERCEPT_SUDO_GID')
-        if os.geteuid() == 0 and sudo_uid and sudo_gid:
+        if hasattr(os, 'geteuid') and hasattr(os, 'chown') and os.geteuid() == 0 and sudo_uid and sudo_gid:
             with contextlib.suppress(OSError, ValueError):
                 os.chown(path, int(sudo_uid), int(sudo_gid))
 

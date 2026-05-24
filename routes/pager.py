@@ -6,8 +6,13 @@ import contextlib
 import math
 import os
 import pathlib
-import pty
 import queue
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import re
 import select
 import struct
@@ -37,6 +42,25 @@ from utils.validation import (
 )
 
 pager_bp = Blueprint('pager', __name__)
+
+
+@pager_bp.before_request
+def _gate_pager_on_windows():
+    """Pager mode uses pty.openpty() to demux rtl_fm → multimon-ng output, and
+    multimon-ng has no Windows binary release. Both blockers — gate POSTs."""
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "Pager (POCSAG/FLEX) decoding",
+            "multimon-ng has no official Windows binary release and the route "
+            "uses POSIX pty pipes that don't exist on Windows.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # Track which device is being used
 pager_active_device: int | None = None

@@ -6,8 +6,13 @@ import contextlib
 import csv
 import json
 import os
-import pty
 import queue
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import re
 import select
 import shutil
@@ -42,6 +47,25 @@ from utils.validation import (
 )
 
 aprs_bp = Blueprint('aprs', __name__, url_prefix='/aprs')
+
+
+@aprs_bp.before_request
+def _gate_aprs_on_windows():
+    """APRS needs direwolf or multimon-ng (neither ships a Windows binary)
+    and uses POSIX pty pipes."""
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "APRS packet radio",
+            "direwolf and multimon-ng don't ship Windows binaries through "
+            "their official releases, and the route uses POSIX pty pipes.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # Track which SDR device is being used
 aprs_active_device: int | None = None

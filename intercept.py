@@ -15,6 +15,15 @@ Requires RTL-SDR hardware for RF modes.
 
 import sys
 
+# Force UTF-8 on stdout/stderr on Windows so emoji/box-drawing in startup
+# banners don't crash with UnicodeEncodeError on cp1252 consoles.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
 # Check Python version early, before imports that use 3.9+ syntax
 
 # Handle --version early before other imports

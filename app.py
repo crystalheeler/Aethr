@@ -25,6 +25,39 @@ import subprocess
 import threading
 from pathlib import Path
 
+
+def _prepend_bundled_tools_to_path() -> None:
+    """On Windows, put bundled SDR tools at the front of PATH so the many
+    ``shutil.which("rtl_fm")`` style calls scattered through the codebase
+    pick up our pinned binaries before any system install.
+
+    No-op on Linux/macOS — bundled tools only ship in the Windows build.
+    """
+    if sys.platform != "win32":
+        return
+
+    # Frozen build: PyInstaller stages data files under sys._MEIPASS.
+    # Dev checkout: tools/ sits at the project root.
+    base = Path(getattr(sys, "_MEIPASS", "")) if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    candidates = [
+        base / "tools" / "windows",
+        base / "tools" / "windows" / "satdump",  # SatDump ships in its own subdir
+    ]
+
+    parts: list[str] = []
+    for c in candidates:
+        if c.is_dir():
+            parts.append(str(c))
+
+    if not parts:
+        return
+
+    existing = os.environ.get("PATH", "")
+    os.environ["PATH"] = os.pathsep.join([*parts, existing]) if existing else os.pathsep.join(parts)
+
+
+_prepend_bundled_tools_to_path()
+
 from flask import (
     Flask,
     Response,
@@ -985,7 +1018,6 @@ def kill_all() -> Response:
     from routes import radiosonde as radiosonde_module
     from utils.bluetooth import reset_bluetooth_scanner
 
-    killed = []
     processes_to_kill = [
         "rtl_fm",
         "multimon-ng",
@@ -1010,13 +1042,9 @@ def kill_all() -> Response:
         "auto_rx",
     ]
 
-    for proc in processes_to_kill:
-        try:
-            result = subprocess.run(["pkill", "-f", proc], capture_output=True)
-            if result.returncode == 0:
-                killed.append(proc)
-        except (subprocess.SubprocessError, OSError):
-            pass
+    from utils.platform import kill_processes_by_name
+
+    killed = kill_processes_by_name(processes_to_kill)
 
     with process_lock:
         current_process = None
@@ -1341,27 +1369,42 @@ def main() -> None:
     print("=" * 50)
     print()
 
-    # Check if running as root (required for WiFi monitor mode, some BT operations)
+    # Check if running with elevated privileges (root on Unix, Administrator on Windows).
+    # Required for WiFi monitor mode and some BT operations on Linux; on Windows
+    # the equivalent is mostly a no-op (most Windows tools don't need elevation),
+    # but we still record the state so routes can branch on it.
     import os
 
-    if os.geteuid() != 0:
+    if hasattr(os, "geteuid"):
+        is_elevated = os.geteuid() == 0
+        elevate_hint = "sudo -E venv/bin/python intercept.py"
+    else:
+        # Windows: use the shell32 IsUserAnAdmin check.
+        try:
+            import ctypes
+
+            is_elevated = bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:
+            is_elevated = False
+        elevate_hint = "Right-click intercept.exe → Run as administrator"
+
+    if not is_elevated:
         print("\033[93m" + "=" * 50)
-        print("  ⚠️  WARNING: Not running as root/sudo")
+        print("  ⚠️  WARNING: Not running with elevated privileges")
         print("=" * 50)
-        print("  Some features require root privileges:")
-        print("    - WiFi monitor mode and scanning")
+        print("  Some features require admin/root privileges:")
+        print("    - WiFi monitor mode and scanning (Linux only)")
         print("    - Bluetooth low-level operations")
         print("    - RTL-SDR access (on some systems)")
         print()
         print("  To run with full capabilities:")
-        print("    sudo -E venv/bin/python intercept.py")
+        print(f"    {elevate_hint}")
         print("=" * 50 + "\033[0m")
         print()
-        # Store for API access
         app.config["RUNNING_AS_ROOT"] = False
     else:
         app.config["RUNNING_AS_ROOT"] = True
-        print("Running as root - full capabilities enabled")
+        print("Running with elevated privileges - full capabilities enabled")
         print()
 
     # Ensure app is initialized (no-op if already done by module-level call)

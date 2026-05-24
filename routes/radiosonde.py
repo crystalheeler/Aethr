@@ -622,16 +622,9 @@ def start_radiosonde():
 
     # Kill any existing process
     if app_module.radiosonde_process:
-        try:
-            pgid = os.getpgid(app_module.radiosonde_process.pid)
-            os.killpg(pgid, 15)
-            app_module.radiosonde_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-            try:
-                pgid = os.getpgid(app_module.radiosonde_process.pid)
-                os.killpg(pgid, 9)
-            except (ProcessLookupError, OSError):
-                pass
+        from utils.platform import terminate_process_tree
+
+        terminate_process_tree(app_module.radiosonde_process.pid, timeout=PROCESS_TERMINATE_TIMEOUT)
         app_module.radiosonde_process = None
         logger.info("Killed existing radiosonde process")
 
@@ -761,16 +754,9 @@ def stop_radiosonde():
 
     with app_module.radiosonde_lock:
         if app_module.radiosonde_process:
-            try:
-                pgid = os.getpgid(app_module.radiosonde_process.pid)
-                os.killpg(pgid, 15)
-                app_module.radiosonde_process.wait(timeout=RADIOSONDE_TERMINATE_TIMEOUT)
-            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-                try:
-                    pgid = os.getpgid(app_module.radiosonde_process.pid)
-                    os.killpg(pgid, 9)
-                except (ProcessLookupError, OSError):
-                    pass
+            from utils.platform import terminate_process_tree
+
+            terminate_process_tree(app_module.radiosonde_process.pid, timeout=RADIOSONDE_TERMINATE_TIMEOUT)
             app_module.radiosonde_process = None
             logger.info("Radiosonde process stopped")
 

@@ -382,16 +382,9 @@ def start_ais():
 
     # Kill any existing process
     if app_module.ais_process:
-        try:
-            pgid = os.getpgid(app_module.ais_process.pid)
-            os.killpg(pgid, 15)
-            app_module.ais_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-            try:
-                pgid = os.getpgid(app_module.ais_process.pid)
-                os.killpg(pgid, 9)
-            except (ProcessLookupError, OSError):
-                pass
+        from utils.platform import terminate_process_tree
+
+        terminate_process_tree(app_module.ais_process.pid, timeout=PROCESS_TERMINATE_TIMEOUT)
         app_module.ais_process = None
         logger.info("Killed existing AIS process")
 
@@ -485,16 +478,9 @@ def stop_ais():
 
     with app_module.ais_lock:
         if app_module.ais_process:
-            try:
-                pgid = os.getpgid(app_module.ais_process.pid)
-                os.killpg(pgid, 15)
-                app_module.ais_process.wait(timeout=AIS_TERMINATE_TIMEOUT)
-            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-                try:
-                    pgid = os.getpgid(app_module.ais_process.pid)
-                    os.killpg(pgid, 9)
-                except (ProcessLookupError, OSError):
-                    pass
+            from utils.platform import terminate_process_tree
+
+            terminate_process_tree(app_module.ais_process.pid, timeout=AIS_TERMINATE_TIMEOUT)
             app_module.ais_process = None
             logger.info("AIS process stopped")
 

@@ -33,6 +33,24 @@ logger = logging.getLogger(__name__)
 wifi_v2_bp = Blueprint("wifi_v2", __name__, url_prefix="/wifi/v2")
 
 
+@wifi_v2_bp.before_request
+def _gate_wifi_v2_on_windows():
+    """v2 backends are all Linux/macOS (nmcli, iw, iwlist, airport). The Quick
+    Scan endpoint will return empty data on Windows, but the Deep Scan /
+    monitor-mode endpoints would crash. Gate write endpoints.
+    """
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == "POST":
+        body, status = windows_not_supported_response(
+            "WiFi scanning",
+            "All supported WiFi backends (nmcli, iw, iwlist, airport) are "
+            "Linux/macOS only.",
+        )
+        return jsonify(body), status
+    return None
+
+
 # =============================================================================
 # Capabilities
 # =============================================================================

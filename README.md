@@ -85,6 +85,19 @@ Troubleshooting (no decode / noisy decode):
 
 ---
 
+## Installation / Windows
+
+Grab `intercept.exe` from the latest [Release](https://github.com/themuseum1960/intercept-test/releases),
+double-click it, then open <http://localhost:5050>. RTL-SDR hardware needs a
+one-time Zadig driver swap. Full guide: [docs/WINDOWS.md](docs/WINDOWS.md).
+
+A few modes (WiFi monitor mode, ACARS, APRS, DSC) can't work on Windows for
+platform-level reasons — they're surfaced with a clean "not supported" message
+in the dashboard. Linux/Docker is still the canonical deployment for full
+feature coverage.
+
+---
+
 ## Installation / Debian / Ubuntu / macOS
 
 ### Quick Start

@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import queue
 import shutil
-import signal
 import struct
 import subprocess
 import threading
@@ -460,27 +459,16 @@ def _stop_audio_stream_internal():
 
     had_processes = audio_process is not None or audio_rtl_process is not None
 
-    # Kill the pipeline processes and their groups
+    # Kill the pipeline processes and their full process trees
+    from utils.platform import terminate_process_tree
+
     if audio_process:
-        try:
-            # Kill entire process group (SDR demod + ffmpeg)
-            try:
-                os.killpg(os.getpgid(audio_process.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                audio_process.kill()
-            audio_process.wait(timeout=0.5)
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            terminate_process_tree(audio_process.pid, timeout=0.5)
 
     if audio_rtl_process:
-        try:
-            try:
-                os.killpg(os.getpgid(audio_rtl_process.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                audio_rtl_process.kill()
-            audio_rtl_process.wait(timeout=0.5)
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            terminate_process_tree(audio_rtl_process.pid, timeout=0.5)
 
     audio_process = None
     audio_rtl_process = None

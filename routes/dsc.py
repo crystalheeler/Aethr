@@ -9,8 +9,13 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import pty
 import queue
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import select
 import shutil
 import subprocess
@@ -50,6 +55,25 @@ from utils.validation import (
 logger = logging.getLogger('intercept.dsc')
 
 dsc_bp = Blueprint('dsc', __name__, url_prefix='/dsc')
+
+
+@dsc_bp.before_request
+def _gate_dsc_on_windows():
+    """DSC decoding uses bin/dsc-decoder, a vendored Linux ELF. We don't
+    ship a Windows build of it (yet)."""
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "DSC (Digital Selective Calling)",
+            "The bundled dsc-decoder binary is Linux-only and we don't have "
+            "a Windows build available yet.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # Module state (track if running independent of process state)
 dsc_running = False

@@ -5,9 +5,72 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("intercept.dependencies")
+
+
+def _bundled_tools_root() -> Path | None:
+    """Locate the bundled Windows tools directory.
+
+    Three cases:
+      1. Running from a PyInstaller bundle (frozen exe): ``sys._MEIPASS`` is
+         set and tools/windows/ was included as a data dir.
+      2. Running from a dev checkout: tools/windows/ sits next to this file's
+         project root.
+      3. Not on Windows: no bundled tools — return None.
+    """
+    if sys.platform != "win32":
+        return None
+
+    # PyInstaller frozen build
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        bundled = Path(meipass) / "tools" / "windows"
+        if bundled.is_dir():
+            return bundled
+
+    # Dev checkout: utils/ -> project root -> tools/windows
+    project_root = Path(__file__).resolve().parent.parent
+    bundled = project_root / "tools" / "windows"
+    if bundled.is_dir():
+        return bundled
+
+    return None
+
+
+def _bundled_windows_tool_path(name: str) -> str | None:
+    """Look for ``name[.exe]`` inside the bundled Windows tools directory.
+
+    Checks both the root of tools/windows/ and any first-level subdirectory
+    (e.g. tools/windows/satdump/satdump.exe). Tools that ship their own
+    private DLL stack live in subdirs so their DLLs don't override the
+    parent's.
+    """
+    root = _bundled_tools_root()
+    if root is None:
+        return None
+
+    # The codebase uses POSIX-style tool names (rtl_fm, multimon-ng, AIS-catcher).
+    # On Windows the binary has a .exe suffix; .py scripts keep their suffix.
+    candidates = [name]
+    if not name.lower().endswith((".exe", ".py", ".bat", ".cmd")):
+        candidates.append(name + ".exe")
+
+    search_dirs = [root]
+    try:
+        search_dirs.extend(d for d in root.iterdir() if d.is_dir())
+    except OSError:
+        pass
+
+    for search_dir in search_dirs:
+        for candidate in candidates:
+            path = search_dir / candidate
+            if path.is_file():
+                return str(path)
+    return None
 
 # Additional paths to search for tools (e.g., /usr/sbin on Debian, /usr/local/bin for source builds)
 EXTRA_TOOL_PATHS = ["/usr/local/bin", "/usr/sbin", "/sbin"]
@@ -33,6 +96,12 @@ def get_tool_path(name: str) -> str | None:
     env_path = os.environ.get(env_key)
     if env_path and os.path.isfile(env_path) and os.access(env_path, os.X_OK):
         return env_path
+
+    # On Windows, prefer the bundled tools/windows/ directory over system PATH.
+    # The bundled binaries are pinned to versions we've smoke-tested with the app.
+    bundled = _bundled_windows_tool_path(name)
+    if bundled:
+        return bundled
 
     # Prefer native Homebrew binaries on Apple Silicon to avoid mixing Rosetta
     # /usr/local tools with arm64 Python/runtime.

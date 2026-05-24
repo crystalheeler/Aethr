@@ -6,8 +6,13 @@ import contextlib
 import json
 import os
 import platform
-import pty
 import queue
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import shutil
 import subprocess
 import threading
@@ -35,6 +40,23 @@ from utils.sse import sse_stream_fanout
 from utils.validation import validate_device_index, validate_gain, validate_ppm
 
 acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
+
+
+@acars_bp.before_request
+def _gate_acars_on_windows():
+    """ACARS uses acarsdec (no Windows binary) and POSIX pty pipes."""
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "ACARS aircraft messaging",
+            "acarsdec has no Windows build and the route relies on POSIX pty pipes.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # Default VHF ACARS frequencies (MHz) - North America primary
 DEFAULT_ACARS_FREQUENCIES = [

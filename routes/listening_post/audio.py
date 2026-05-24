@@ -116,7 +116,9 @@ def start_audio() -> Response:
                 with contextlib.suppress(Exception):
                     scanner_proc_ref.kill()
         with contextlib.suppress(Exception):
-            subprocess.run(['pkill', '-9', 'rtl_power'], capture_output=True, timeout=0.5)
+            from utils.platform import kill_processes_by_name
+
+            kill_processes_by_name(['rtl_power'])
         time.sleep(0.5)
 
     # Re-acquire lock for waterfall check and device claim

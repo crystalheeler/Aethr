@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextlib
 import os
 import queue
-import signal
 import subprocess
 import threading
 from typing import Any
@@ -278,17 +277,13 @@ def cleanup_ook(*, emit_status: bool = True) -> None:
     _close_pipe(getattr(proc, 'stdout', None))
     _close_pipe(getattr(proc, 'stderr', None))
 
-    # Kill the entire process group so child processes are cleaned up
+    # Terminate the full process tree (cross-platform)
+    from utils.platform import terminate_process_tree
+
     try:
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            os.killpg(pgid, signal.SIGKILL)
-            proc.wait(timeout=3)
-    except (ProcessLookupError, OSError):
-        # Process already dead — fall back to normal terminate
+        terminate_process_tree(proc.pid, timeout=2.0)
+    except Exception:
+        # Fall back to normal terminate if psutil/walk failed
         safe_terminate(proc)
     unregister_process(proc)
     app_module.ook_process = None

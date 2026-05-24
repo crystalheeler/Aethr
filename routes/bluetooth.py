@@ -5,8 +5,13 @@ from __future__ import annotations
 import contextlib
 import os
 import platform
-import pty
 import queue
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import re
 import select
 import subprocess
@@ -30,6 +35,28 @@ from utils.sse import sse_stream_fanout
 from utils.validation import validate_bluetooth_interface
 
 bluetooth_bp = Blueprint('bluetooth', __name__, url_prefix='/bt')
+
+
+@bluetooth_bp.before_request
+def _gate_bluetooth_v1_on_windows():
+    """Legacy Bluetooth blueprint shells out to BlueZ tools (hcitool,
+    bluetoothctl) which don't exist on Windows. The v2 Bluetooth blueprint
+    uses bleak with the WinRT backend and works on Windows; route the
+    dashboard there instead.
+    """
+    from flask import jsonify, request
+
+    from utils.platform import IS_WINDOWS, windows_not_supported_response
+
+    if IS_WINDOWS and request.method == 'POST':
+        body, status = windows_not_supported_response(
+            "Legacy Bluetooth scanning (BlueZ)",
+            "The hcitool/bluetoothctl backends are BlueZ-only (Linux). The "
+            "bleak/WinRT backend used by /bt/v2/* works on Windows instead.",
+        )
+        return jsonify(body), status
+    return None
+
 
 # --- v1 deprecation ---
 # These endpoints are deprecated in favor of /api/bluetooth/*.
@@ -479,8 +506,9 @@ def reset_bt_adapter():
             app_module.bt_process = None
 
     try:
-        subprocess.run(['pkill', '-f', 'hcitool'], capture_output=True, timeout=2)
-        subprocess.run(['pkill', '-f', 'bluetoothctl'], capture_output=True, timeout=2)
+        from utils.platform import kill_processes_by_name
+
+        kill_processes_by_name(['hcitool', 'bluetoothctl'])
         time.sleep(0.5)
 
         subprocess.run(['rfkill', 'unblock', 'bluetooth'], capture_output=True, timeout=5)

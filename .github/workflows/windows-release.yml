@@ -1,0 +1,98 @@
+name: Windows Release Build
+
+# Builds a single-file Windows .exe via PyInstaller and (when triggered by a
+# version tag) attaches it to the matching GitHub release.
+#
+# Triggers:
+#   - tag push matching v*.*.*  → builds + attaches to the GitHub release
+#   - workflow_dispatch          → manual builds for testing (artifact only)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to upload the .exe to a release
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout (with LFS / large files)
+        uses: actions/checkout@v4
+        with:
+          # Bundled SDR tool binaries under tools/windows/ are committed to
+          # the repo. They're not LFS objects, so a plain checkout is fine.
+          fetch-depth: 1
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # gunicorn is Linux/macOS only — strip it from the install set on Windows.
+          grep -v '^gunicorn' requirements.txt > requirements-windows.txt
+          pip install -r requirements-windows.txt
+          pip install pyinstaller==6.20.0
+
+      - name: Confirm bundled tools are present
+        shell: bash
+        run: |
+          if [ ! -d tools/windows ]; then
+            echo "::error::tools/windows/ directory is missing — the bundled SDR binaries must be committed before this workflow can build a useful release."
+            exit 1
+          fi
+          echo "Bundled tool files:"
+          ls -lh tools/windows/
+
+      - name: Smoke-test app import
+        shell: bash
+        run: |
+          python -c "import app; assert len(app.app.blueprints) > 0, 'no blueprints registered'; print('OK,', len(app.app.blueprints), 'blueprints')"
+
+      - name: Build exe
+        shell: bash
+        run: |
+          pyinstaller --clean --noconfirm intercept.spec
+          ls -lh dist/
+
+      - name: Smoke-test built exe
+        shell: pwsh
+        run: |
+          # Launch the exe, wait a few seconds, hit /health, then kill it.
+          $env:INTERCEPT_DISABLE_AUTH = "1"
+          $proc = Start-Process -FilePath "dist\intercept.exe" -ArgumentList "--port", "5055" -PassThru
+          Start-Sleep -Seconds 15
+          try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:5055/health" -UseBasicParsing -TimeoutSec 10
+            if ($resp.StatusCode -ne 200) {
+              Write-Error "Health check returned $($resp.StatusCode)"
+              exit 1
+            }
+            Write-Host "Health check OK (HTTP $($resp.StatusCode))"
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: intercept-windows-x64
+          path: dist/intercept.exe
+          retention-days: 30
+
+      - name: Attach to release (tagged builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/intercept.exe
+          fail_on_unmatched_files: true
+          # Don't draft / prerelease — let the user manage release state.

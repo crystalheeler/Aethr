@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .dependencies import check_tool
+from .platform import IS_WINDOWS, kill_processes_by_name, terminate_process_tree
 
 logger = logging.getLogger('intercept.process')
 
@@ -153,9 +154,7 @@ def cleanup_stale_processes() -> None:
     """Kill any stale processes from previous runs (but not system services)."""
     # Note: dump1090 is NOT included here as users may run it as a system service
     processes_to_kill = ['rtl_adsb', 'rtl_433', 'multimon-ng', 'rtl_fm']
-    for proc_name in processes_to_kill:
-        with contextlib.suppress(subprocess.SubprocessError, OSError):
-            subprocess.run(['pkill', '-9', proc_name], capture_output=True)
+    kill_processes_by_name(processes_to_kill)
 
 
 _DUMP1090_PID_FILE = Path(__file__).resolve().parent.parent / 'instance' / 'dump1090.pid'
@@ -183,18 +182,13 @@ def clear_dump1090_pid() -> None:
 def _is_dump1090_process(pid: int) -> bool:
     """Check if the given PID is actually a dump1090/readsb process."""
     try:
-        if platform.system() == 'Linux':
-            cmdline_path = Path(f'/proc/{pid}/cmdline')
-            if cmdline_path.exists():
-                cmdline = cmdline_path.read_bytes().replace(b'\x00', b' ').decode('utf-8', errors='ignore')
-                return 'dump1090' in cmdline or 'readsb' in cmdline
-        # macOS or fallback
-        result = subprocess.run(
-            ['ps', '-p', str(pid), '-o', 'comm='],
-            capture_output=True, text=True, timeout=5
-        )
-        comm = result.stdout.strip()
-        return 'dump1090' in comm or 'readsb' in comm
+        import psutil
+
+        proc = psutil.Process(pid)
+        name = proc.name() or ''
+        cmdline = ' '.join(proc.cmdline() or [])
+        haystack = (name + ' ' + cmdline).lower()
+        return 'dump1090' in haystack or 'readsb' in haystack
     except Exception:
         return False
 
@@ -221,24 +215,9 @@ def cleanup_stale_dump1090() -> None:
         clear_dump1090_pid()
         return
 
-    # Kill the process group
+    # Terminate the process tree (children inclusive)
     logger.info(f"Killing stale app-spawned dump1090 (PID {pid})")
-    try:
-        pgid = os.getpgid(pid)
-        os.killpg(pgid, signal.SIGTERM)
-        # Brief wait for graceful shutdown
-        for _ in range(10):
-            try:
-                os.kill(pid, 0)  # Check if still alive
-                time.sleep(0.2)
-            except OSError:
-                break
-        else:
-            # Still alive, force kill
-            with contextlib.suppress(OSError):
-                os.killpg(pgid, signal.SIGKILL)
-    except OSError as e:
-        logger.debug(f"Error killing stale dump1090 PID {pid}: {e}")
+    terminate_process_tree(pid, timeout=2.0)
 
     clear_dump1090_pid()
 

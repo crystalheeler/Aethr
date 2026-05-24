@@ -1057,18 +1057,11 @@ def start_adsb():
                 f"readsb or dump1090 not found for {sdr_type.value}. Install readsb with SoapySDR support."
             )
 
-    # Kill any stale app-started process (use process group to ensure full cleanup)
+    # Kill any stale app-started process (full tree cleanup, cross-platform)
     if app_module.adsb_process:
-        try:
-            pgid = os.getpgid(app_module.adsb_process.pid)
-            os.killpg(pgid, 15)  # SIGTERM
-            app_module.adsb_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-            try:
-                pgid = os.getpgid(app_module.adsb_process.pid)
-                os.killpg(pgid, 9)  # SIGKILL
-            except (ProcessLookupError, OSError):
-                pass
+        from utils.platform import terminate_process_tree
+
+        terminate_process_tree(app_module.adsb_process.pid, timeout=PROCESS_TERMINATE_TIMEOUT)
         app_module.adsb_process = None
         clear_dump1090_pid()
         logger.info("Killed stale ADS-B process")
@@ -1184,16 +1177,9 @@ def start_adsb():
         # device is released and report a clear error to the frontend.
         if not dump1090_ready:
             logger.warning("dump1090 running but SBS port not available after %.1fs — killing", DUMP1090_START_WAIT)
-            try:
-                pgid = os.getpgid(app_module.adsb_process.pid)
-                os.killpg(pgid, 15)
-                app_module.adsb_process.wait(timeout=ADSB_TERMINATE_TIMEOUT)
-            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-                try:
-                    pgid = os.getpgid(app_module.adsb_process.pid)
-                    os.killpg(pgid, 9)
-                except (ProcessLookupError, OSError):
-                    pass
+            from utils.platform import terminate_process_tree
+
+            terminate_process_tree(app_module.adsb_process.pid, timeout=ADSB_TERMINATE_TIMEOUT)
             app_module.adsb_process = None
             clear_dump1090_pid()
             app_module.release_sdr_device(device_int, sdr_type_str)
@@ -1242,18 +1228,9 @@ def stop_adsb():
 
     with app_module.adsb_lock:
         if app_module.adsb_process:
-            try:
-                # Kill the entire process group to ensure all child processes are terminated
-                pgid = os.getpgid(app_module.adsb_process.pid)
-                os.killpg(pgid, 15)  # SIGTERM
-                app_module.adsb_process.wait(timeout=ADSB_TERMINATE_TIMEOUT)
-            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
-                try:
-                    # Force kill if terminate didn't work
-                    pgid = os.getpgid(app_module.adsb_process.pid)
-                    os.killpg(pgid, 9)  # SIGKILL
-                except (ProcessLookupError, OSError):
-                    pass
+            from utils.platform import terminate_process_tree
+
+            terminate_process_tree(app_module.adsb_process.pid, timeout=ADSB_TERMINATE_TIMEOUT)
             app_module.adsb_process = None
             clear_dump1090_pid()
             logger.info("ADS-B process stopped")

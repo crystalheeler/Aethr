@@ -35,8 +35,10 @@ def check_capabilities() -> SystemCapabilities:
     """
     caps = SystemCapabilities()
 
-    # Check permissions
-    caps.is_root = os.geteuid() == 0
+    # Check permissions (cross-platform: root on Unix, Administrator on Windows)
+    from utils.platform import is_admin
+
+    caps.is_root = is_admin()
 
     # Check DBus
     _check_dbus(caps)

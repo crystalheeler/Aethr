@@ -142,7 +142,9 @@ def devices():
     except Exception:
         pass
 
-    running_as_root = os.geteuid() == 0
+    from utils.platform import is_admin
+
+    running_as_root = is_admin()
     warnings = []
     if not running_as_root:
         warnings.append(

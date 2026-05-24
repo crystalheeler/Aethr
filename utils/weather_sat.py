@@ -14,8 +14,13 @@ from __future__ import annotations
 
 import contextlib
 import os
-import pty
 import re
+
+try:
+    import pty
+except ImportError:  # Windows: pty unavailable (requires termios)
+    pty = None  # type: ignore[assignment]
+
 import select
 import shutil
 import subprocess
