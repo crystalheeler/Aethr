@@ -6,11 +6,31 @@ import logging
 import os
 import sys
 
-# Application version
-VERSION = "2.27.0"
+# Application version.
+#
+# Fork-versioning scheme: the leading "X.Y.Z" tracks the upstream smittix/intercept
+# release we're based on. We append a "-<suffix>" identifier for our own fork revisions
+# made on top of that upstream version. The suffix cycles:
+#     a, b, c, …, z         (single letter — 26 revisions)
+#     aa, bb, cc, …, zz     (doubled letter — 26 more)
+#     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
+# Each new upstream version resets the suffix back to "-a".
+VERSION = "2.27.0-a"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-a",
+        "date": "May 2026",
+        "highlights": [
+            "Feat: Windows .exe build via PyInstaller, attached to GitHub releases",
+            "Feat: bundle Windows SDR tool binaries (RTL-SDR Blog, rtl_433, AIS-catcher, SatDump)",
+            "Feat: cross-platform process management — replaces Unix-only os.killpg / pkill",
+            "Feat: clean 503 PLATFORM_UNSUPPORTED gating for modes that can't work on Windows",
+            "Chore: change default port from 5050 to 6969 (avoids common Windows port conflict)",
+            "Docs: docs/WINDOWS.md install guide with Zadig driver setup and known limitations",
+        ],
+    },
     {
         "version": "2.27.0",
         "date": "May 2026",
