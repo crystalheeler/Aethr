@@ -69,6 +69,10 @@ jobs:
         run: |
           # Launch the exe, wait a few seconds, hit /health, then kill it.
           $env:INTERCEPT_DISABLE_AUTH = "1"
+          # Skip the pystray tray-icon runtime on headless CI runners — it
+          # owns the main thread and can't init without a display. Falls
+          # through to the regular Flask dev-server path.
+          $env:INTERCEPT_NO_TRAY = "1"
           $proc = Start-Process -FilePath "dist\intercept.exe" -ArgumentList "--port", "5055" -PassThru
           Start-Sleep -Seconds 15
           try {
