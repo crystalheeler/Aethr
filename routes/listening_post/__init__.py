@@ -300,8 +300,10 @@ def _start_audio_stream(
     # Retry loop outside lock — spawning + health check sleeps don't block
     # other operations. audio_start_lock already serializes callers.
     try:
-        rtl_stderr_log = '/tmp/rtl_fm_stderr.log'
-        ffmpeg_stderr_log = '/tmp/ffmpeg_stderr.log'
+        import tempfile
+        _temp_dir = tempfile.gettempdir()  # /tmp on POSIX, %TEMP% on Windows
+        rtl_stderr_log = os.path.join(_temp_dir, 'rtl_fm_stderr.log')
+        ffmpeg_stderr_log = os.path.join(_temp_dir, 'ffmpeg_stderr.log')
         logger.info(f"Starting audio: {frequency} MHz, mod={modulation}, device={device_index}")
 
         new_rtl_proc = None

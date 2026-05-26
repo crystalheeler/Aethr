@@ -15,10 +15,21 @@ import sys
 #     aa, bb, cc, …, zz     (doubled letter — 26 more)
 #     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
 # Each new upstream version resets the suffix back to "-a".
-VERSION = "2.27.0-a"
+VERSION = "2.27.0-b"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-b",
+        "date": "May 2026",
+        "highlights": [
+            "Fix: Waterfall + Monitor audio chop — audio demod now runs in its own thread, independent of FFT loop CPU budget",
+            "Fix: Windowed Windows runtime — pystray tray icon owns lifecycle, clean shutdown via Quit menu (Ctrl+C never worked under Werkzeug threading)",
+            "Fix: subprocess windows no longer flash on screen when probing rtl_sdr / dump1090 / multimon-ng (frozen-exe-only CREATE_NO_WINDOW monkey-patch)",
+            "Perf: replace np.interp linear-interp resampler with scipy.signal.resample_poly polyphase FIR (proper anti-aliased)",
+            "Fix: listening_post hardcoded /tmp/ paths replaced with tempfile.gettempdir()",
+        ],
+    },
     {
         "version": "2.27.0-a",
         "date": "May 2026",

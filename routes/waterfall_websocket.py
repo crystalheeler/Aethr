@@ -10,10 +10,12 @@ import subprocess
 import threading
 import time
 from contextlib import suppress
+from fractions import Fraction
 from typing import Any
 
 import numpy as np
 from flask import Flask
+from scipy.signal import resample_poly
 
 try:
     from flask_sock import Sock
@@ -208,6 +210,19 @@ def _push_shared_audio_chunk(chunk: bytes) -> None:
         _shared_audio_queue.put_nowait(chunk)
 
 
+def _resample_ratio(src_rate: int, dst_rate: int) -> tuple[int, int]:
+    """Return (up, down) integers for polyphase resampling src→dst.
+
+    Uses Fraction.limit_denominator to keep the FIR filter length sane
+    even when the rate ratio isn't a clean fraction (e.g. 48761→48000
+    becomes a near-1:1 fraction instead of 48000:48761).
+    """
+    if src_rate <= 0 or dst_rate <= 0:
+        return 1, 1
+    frac = Fraction(int(dst_rate), int(src_rate)).limit_denominator(1000)
+    return max(1, frac.numerator), max(1, frac.denominator)
+
+
 def _demodulate_monitor_audio(
     samples: np.ndarray,
     sample_rate: int,
@@ -217,6 +232,13 @@ def _demodulate_monitor_audio(
     squelch: int,
     rotator_phase: float = 0.0,
 ) -> tuple[bytes | None, float]:
+    """Demodulate an IQ chunk into 48 kHz mono int16 PCM bytes.
+
+    Resamples via ``scipy.signal.resample_poly`` (polyphase FIR — proper
+    anti-aliased) at the natural rate determined by the input chunk size.
+    Producer is paced by the IQ stream (now running in its own thread),
+    so no per-chunk rate hacks needed.
+    """
     if samples.size < 32 or sample_rate <= 0:
         return None, float(rotator_phase)
 
@@ -261,18 +283,19 @@ def _demodulate_monitor_audio(
 
     audio = audio - float(np.mean(audio))
 
-    if mod in ('fm', 'am', 'usb', 'lsb'):
-        taps = int(max(1, min(31, fs1 / 12000.0)))
-        if taps > 1:
-            kernel = np.ones(taps, dtype=np.float32) / float(taps)
-            audio = np.convolve(audio, kernel, mode='same')
+    # Proper anti-aliased resample via polyphase FIR. Replaces the old
+    # np.interp linear-interp, which aliased noticeably at fractional
+    # rate ratios.
+    src_rate = int(round(fs1))
+    up, down = _resample_ratio(src_rate, AUDIO_SAMPLE_RATE)
+    if up == down == 1:
+        # Source already at target rate — skip the resample.
+        pass
+    else:
+        audio = resample_poly(audio, up, down).astype(np.float32)
 
-    out_len = int(audio.size * AUDIO_SAMPLE_RATE / fs1)
-    if out_len < 32:
+    if audio.size < 32:
         return None, next_phase
-    x_old = np.linspace(0.0, 1.0, audio.size, endpoint=False, dtype=np.float32)
-    x_new = np.linspace(0.0, 1.0, out_len, endpoint=False, dtype=np.float32)
-    audio = np.interp(x_new, x_old, audio).astype(np.float32)
 
     rms = float(np.sqrt(np.mean(audio * audio) + 1e-12))
     level = min(100.0, rms * 450.0)
@@ -365,6 +388,18 @@ def init_waterfall_websocket(app: Flask):
 
         iq_process = None
         reader_thread = None
+        drainer_thread = None
+        audio_thread = None
+        # In-memory IQ byte buffers. The drainer fans out raw chunks
+        # from rtl_sdr.exe stdout to BOTH queues:
+        #   * iq_bytes_queue — consumed by fft_reader for the waterfall
+        #   * audio_iq_queue — consumed by audio_demod for monitor audio
+        # Each queue is sized for ~2 s of headroom at 2 MS/s with 64 KB
+        # chunks. When full, oldest chunks get dropped independently
+        # per queue — preferable to backing up the OS pipe and making
+        # the dongle drop hardware samples.
+        iq_bytes_queue: queue.Queue[bytes] = queue.Queue(maxsize=64)
+        audio_iq_queue: queue.Queue[bytes] = queue.Queue(maxsize=64)
         stop_event = threading.Event()
         claimed_device = None
         claimed_sdr_type = 'rtlsdr'
@@ -425,6 +460,10 @@ def init_waterfall_websocket(app: Flask):
                     stop_event.set()
                     if reader_thread and reader_thread.is_alive():
                         reader_thread.join(timeout=2)
+                    if audio_thread and audio_thread.is_alive():
+                        audio_thread.join(timeout=2)
+                    if drainer_thread and drainer_thread.is_alive():
+                        drainer_thread.join(timeout=2)
                     if iq_process:
                         safe_terminate(iq_process)
                         unregister_process(iq_process)
@@ -647,40 +686,94 @@ def init_waterfall_websocket(app: Flask):
                         'vfo_freq_mhz': target_vfo_mhz,
                     }))
 
-                    # Start reader thread — puts frames on queue, never calls ws.send()
-                    def fft_reader(
-                        proc, _send_q, stop_evt,
-                        _fft_size, _avg_count, _fps, _sample_rate,
-                        _start_freq, _end_freq, _center_mhz,
-                        _db_min=None, _db_max=None,
-                    ):
-                        """Read I/Q from subprocess, compute FFT, enqueue binary frames."""
-                        required_fft_samples = _fft_size * _avg_count
-                        timeslice_samples = max(required_fft_samples, int(_sample_rate / max(1, _fps)))
-                        bytes_per_frame = timeslice_samples * 2
-                        frame_interval = 1.0 / _fps
-                        monitor_rotator_phase = 0.0
-                        last_monitor_offset_hz = None
-
+                    # ──────────────────────────────────────────────────────────
+                    # Drainer thread — does ONLY pipe reads and fans out to
+                    # BOTH downstream queues (FFT path and audio-demod path).
+                    #
+                    # rtl_sdr.exe streams ~2 MB/s into a Windows subprocess
+                    # pipe whose OS buffer is small (~64 KB). If any consumer
+                    # ever pauses, that pipe fills, rtl_sdr blocks on its
+                    # write, and the dongle drops samples at the hardware
+                    # level — much worse than dropping a chunk downstream.
+                    #
+                    # The drainer keeps the pipe continuously emptied into
+                    # two in-memory queues, one per consumer. If a consumer
+                    # can't keep up, its queue fills and oldest bytes get
+                    # dropped independently — neither consumer can starve
+                    # the other.
+                    # ──────────────────────────────────────────────────────────
+                    def iq_drainer(proc, fft_q, audio_q, stop_evt):
+                        """Drain rtl_sdr.exe stdout and fan out to FFT + audio queues."""
                         try:
                             while not stop_evt.is_set():
                                 if proc.poll() is not None:
                                     break
+                                # 65536 keeps single read() calls under ~30 ms at 2 MS/s.
+                                chunk = proc.stdout.read(65536)
+                                if not chunk:
+                                    break
+                                for q in (fft_q, audio_q):
+                                    try:
+                                        q.put_nowait(chunk)
+                                    except queue.Full:
+                                        # Drop oldest to make room.
+                                        with suppress(queue.Empty):
+                                            q.get_nowait()
+                                        with suppress(queue.Full):
+                                            q.put_nowait(chunk)
+                        except Exception as e:
+                            logger.debug(f"IQ drainer stopped: {e}")
+
+                    # ──────────────────────────────────────────────────────────
+                    # FFT reader thread — waterfall path only.
+                    #
+                    # As of the audio-thread split, this thread only handles
+                    # the FFT/quantize/build_binary_frame pipeline for the
+                    # waterfall display. Audio demod lives in audio_demod
+                    # (below) with its own queue, so a slow FFT loop no
+                    # longer starves audio.
+                    # ──────────────────────────────────────────────────────────
+                    def fft_reader(
+                        proc, _send_q, byte_q, stop_evt,
+                        _fft_size, _avg_count, _fps, _sample_rate,
+                        _start_freq, _end_freq,
+                        _db_min=None, _db_max=None,
+                    ):
+                        """Pull I/Q bytes from FFT queue, compute FFT, enqueue frames."""
+                        required_fft_samples = _fft_size * _avg_count
+                        timeslice_samples = max(required_fft_samples, int(_sample_rate / max(1, _fps)))
+                        bytes_per_frame = timeslice_samples * 2
+                        frame_interval = 1.0 / _fps
+
+                        # Drainer pushes arbitrary-sized chunks; we need fixed
+                        # `bytes_per_frame` chunks. Accumulate leftovers across
+                        # iterations in `pending`.
+                        pending = bytearray()
+
+                        try:
+                            while not stop_evt.is_set():
+                                if proc.poll() is not None and byte_q.empty() and len(pending) < _fft_size * 2:
+                                    break
 
                                 frame_start = time.monotonic()
 
-                                # Read raw I/Q bytes
-                                raw = b''
-                                remaining = bytes_per_frame
-                                while remaining > 0 and not stop_evt.is_set():
-                                    chunk = proc.stdout.read(min(remaining, 65536))
-                                    if not chunk:
-                                        break
-                                    raw += chunk
-                                    remaining -= len(chunk)
+                                # Pull from FFT queue until we have a frame's worth
+                                while len(pending) < bytes_per_frame and not stop_evt.is_set():
+                                    try:
+                                        chunk = byte_q.get(timeout=1.0)
+                                    except queue.Empty:
+                                        if proc.poll() is not None:
+                                            break
+                                        continue
+                                    pending.extend(chunk)
 
-                                if len(raw) < _fft_size * 2:
+                                if len(pending) < _fft_size * 2:
                                     break
+
+                                # Take exactly bytes_per_frame (or whatever's left if subprocess died)
+                                take = min(bytes_per_frame, len(pending))
+                                raw = bytes(pending[:take])
+                                del pending[:take]
 
                                 # Process FFT pipeline
                                 samples = cu8_to_complex(raw)
@@ -703,33 +796,6 @@ def init_waterfall_websocket(app: Flask):
                                 with suppress(queue.Full):
                                     _send_q.put_nowait(frame)
 
-                                monitor_cfg = _snapshot_monitor_config()
-                                if monitor_cfg:
-                                    center_mhz_cfg = float(monitor_cfg.get('center_mhz', _center_mhz))
-                                    monitor_mhz_cfg = float(monitor_cfg.get('monitor_freq_mhz', _center_mhz))
-                                    offset_hz = (monitor_mhz_cfg - center_mhz_cfg) * 1e6
-                                    if (
-                                        last_monitor_offset_hz is None
-                                        or abs(offset_hz - last_monitor_offset_hz) > 1.0
-                                    ):
-                                        monitor_rotator_phase = 0.0
-                                        last_monitor_offset_hz = offset_hz
-
-                                    audio_chunk, monitor_rotator_phase = _demodulate_monitor_audio(
-                                        samples=samples,
-                                        sample_rate=_sample_rate,
-                                        center_mhz=center_mhz_cfg,
-                                        monitor_freq_mhz=monitor_mhz_cfg,
-                                        modulation=monitor_cfg.get('modulation', 'wfm'),
-                                        squelch=int(monitor_cfg.get('squelch', 0)),
-                                        rotator_phase=monitor_rotator_phase,
-                                    )
-                                    if audio_chunk:
-                                        _push_shared_audio_chunk(audio_chunk)
-                                else:
-                                    monitor_rotator_phase = 0.0
-                                    last_monitor_offset_hz = None
-
                                 # Pace to target FPS
                                 elapsed = time.monotonic() - frame_start
                                 sleep_time = frame_interval - elapsed
@@ -739,17 +805,133 @@ def init_waterfall_websocket(app: Flask):
                         except Exception as e:
                             logger.debug(f"FFT reader stopped: {e}")
 
+                    # ──────────────────────────────────────────────────────────
+                    # Audio demod thread — independent of the FFT loop.
+                    #
+                    # Pulls IQ bytes from its own queue (fanned out by the
+                    # drainer) and produces 48 kHz mono PCM into the shared
+                    # audio queue at the natural IQ rate. Because it doesn't
+                    # share CPU budget with the FFT pipeline, there are no
+                    # rate-mismatch hacks needed — if the demod can keep up
+                    # with the IQ stream (which it easily can for one mono
+                    # stream on any modern machine), audio produces in real
+                    # time naturally.
+                    #
+                    # Backpressure: when the shared audio queue is full,
+                    # skip the demod work for this chunk — the rotator
+                    # phase is advanced manually to stay coherent.
+                    # ──────────────────────────────────────────────────────────
+                    def audio_demod(proc, audio_q, stop_evt, _sample_rate):
+                        """Pull I/Q bytes from audio queue, demodulate, push PCM."""
+                        # Process in ~32 KiB IQ chunks (~32 ms at 1 MS/s).
+                        # Smaller than the FFT chunk size for snappier
+                        # tune response without thrashing on tiny chunks.
+                        chunk_bytes = 32768
+                        pending = bytearray()
+                        rotator_phase = 0.0
+                        last_offset_hz: float | None = None
+
+                        try:
+                            while not stop_evt.is_set():
+                                if proc.poll() is not None and audio_q.empty() and len(pending) < chunk_bytes:
+                                    break
+
+                                # Fill pending to one demod chunk
+                                while len(pending) < chunk_bytes and not stop_evt.is_set():
+                                    try:
+                                        chunk = audio_q.get(timeout=1.0)
+                                    except queue.Empty:
+                                        if proc.poll() is not None:
+                                            break
+                                        continue
+                                    pending.extend(chunk)
+
+                                if len(pending) < chunk_bytes:
+                                    continue
+
+                                raw = bytes(pending[:chunk_bytes])
+                                del pending[:chunk_bytes]
+
+                                monitor_cfg = _snapshot_monitor_config()
+                                if not monitor_cfg:
+                                    # Monitor disabled — discard IQ, reset state.
+                                    rotator_phase = 0.0
+                                    last_offset_hz = None
+                                    continue
+
+                                center_mhz_cfg = float(monitor_cfg.get('center_mhz', 0.0))
+                                monitor_mhz_cfg = float(monitor_cfg.get('monitor_freq_mhz', 0.0))
+                                offset_hz = (monitor_mhz_cfg - center_mhz_cfg) * 1e6
+
+                                if (
+                                    last_offset_hz is None
+                                    or abs(offset_hz - last_offset_hz) > 1.0
+                                ):
+                                    rotator_phase = 0.0
+                                    last_offset_hz = offset_hz
+
+                                # Backpressure: if the shared audio queue is
+                                # already full, the browser isn't keeping up.
+                                # Skip demod, advance rotator phase to stay
+                                # coherent for when we resume.
+                                if _shared_audio_queue.full():
+                                    n_iq = chunk_bytes // 2
+                                    phase_inc = (2.0 * np.pi * offset_hz) / float(_sample_rate)
+                                    rotator_phase = float(
+                                        (rotator_phase + phase_inc * n_iq) % (2.0 * np.pi)
+                                    )
+                                    continue
+
+                                samples = cu8_to_complex(raw)
+                                audio_chunk, rotator_phase = _demodulate_monitor_audio(
+                                    samples=samples,
+                                    sample_rate=_sample_rate,
+                                    center_mhz=center_mhz_cfg,
+                                    monitor_freq_mhz=monitor_mhz_cfg,
+                                    modulation=monitor_cfg.get('modulation', 'wfm'),
+                                    squelch=int(monitor_cfg.get('squelch', 0)),
+                                    rotator_phase=rotator_phase,
+                                )
+                                if audio_chunk:
+                                    _push_shared_audio_chunk(audio_chunk)
+
+                        except Exception as e:
+                            logger.debug(f"Audio demod stopped: {e}")
+
+                    # Reset both in-memory IQ buffers for this capture run.
+                    for _q in (iq_bytes_queue, audio_iq_queue):
+                        with suppress(queue.Empty):
+                            while True:
+                                _q.get_nowait()
+
+                    drainer_thread = threading.Thread(
+                        target=iq_drainer,
+                        args=(iq_process, iq_bytes_queue, audio_iq_queue, stop_event),
+                        daemon=True,
+                        name="wf-iq-drainer",
+                    )
+                    drainer_thread.start()
+
                     reader_thread = threading.Thread(
                         target=fft_reader,
                         args=(
-                            iq_process, send_queue, stop_event,
+                            iq_process, send_queue, iq_bytes_queue, stop_event,
                             fft_size, avg_count, fps, sample_rate,
-                            start_freq, end_freq, center_freq_mhz,
+                            start_freq, end_freq,
                             db_min, db_max,
                         ),
                         daemon=True,
+                        name="wf-fft-reader",
                     )
                     reader_thread.start()
+
+                    audio_thread = threading.Thread(
+                        target=audio_demod,
+                        args=(iq_process, audio_iq_queue, stop_event, sample_rate),
+                        daemon=True,
+                        name="wf-audio-demod",
+                    )
+                    audio_thread.start()
 
                 elif cmd in ('tune', 'set_vfo'):
                     if not iq_process or claimed_device is None or iq_process.poll() is not None:
@@ -804,7 +986,13 @@ def init_waterfall_websocket(app: Flask):
                     stop_event.set()
                     if reader_thread and reader_thread.is_alive():
                         reader_thread.join(timeout=2)
-                        reader_thread = None
+                    reader_thread = None
+                    if audio_thread and audio_thread.is_alive():
+                        audio_thread.join(timeout=2)
+                    audio_thread = None
+                    if drainer_thread and drainer_thread.is_alive():
+                        drainer_thread.join(timeout=2)
+                    drainer_thread = None
                     if iq_process:
                         safe_terminate(iq_process)
                         unregister_process(iq_process)
@@ -826,6 +1014,10 @@ def init_waterfall_websocket(app: Flask):
             stop_event.set()
             if reader_thread and reader_thread.is_alive():
                 reader_thread.join(timeout=2)
+            if audio_thread and audio_thread.is_alive():
+                audio_thread.join(timeout=2)
+            if drainer_thread and drainer_thread.is_alive():
+                drainer_thread.join(timeout=2)
             if iq_process:
                 safe_terminate(iq_process)
                 unregister_process(iq_process)

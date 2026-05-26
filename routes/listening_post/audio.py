@@ -6,9 +6,15 @@ import contextlib
 import os
 import select
 import subprocess
+import tempfile
 import time
 
 from flask import Response, jsonify, request
+
+_TEMP_DIR = tempfile.gettempdir()  # /tmp on POSIX, %TEMP% on Windows
+_RTL_STDERR_LOG = os.path.join(_TEMP_DIR, 'rtl_fm_stderr.log')
+_FFMPEG_STDERR_LOG = os.path.join(_TEMP_DIR, 'ffmpeg_stderr.log')
+_AUDIO_PROBE_PATH = os.path.join(_TEMP_DIR, 'audio_probe.bin')
 
 import routes.listening_post as _state
 
@@ -226,7 +232,7 @@ def start_audio() -> Response:
             _state.receiver_active_sdr_type = 'rtlsdr'
 
         start_error = ''
-        for log_path in ('/tmp/rtl_fm_stderr.log', '/tmp/ffmpeg_stderr.log'):
+        for log_path in (_RTL_STDERR_LOG, _FFMPEG_STDERR_LOG):
             try:
                 with open(log_path) as handle:
                     content = handle.read().strip()
@@ -280,9 +286,9 @@ def audio_status() -> Response:
 @receiver_bp.route('/audio/debug')
 def audio_debug() -> Response:
     """Get audio debug status and recent stderr logs."""
-    rtl_log_path = '/tmp/rtl_fm_stderr.log'
-    ffmpeg_log_path = '/tmp/ffmpeg_stderr.log'
-    sample_path = '/tmp/audio_probe.bin'
+    rtl_log_path = _RTL_STDERR_LOG
+    ffmpeg_log_path = _FFMPEG_STDERR_LOG
+    sample_path = _AUDIO_PROBE_PATH
 
     def _read_log(path: str) -> str:
         try:
@@ -327,7 +333,7 @@ def audio_probe() -> Response:
             data = read_shared_monitor_audio_chunk(timeout=2.0)
             if not data:
                 return jsonify({'status': 'error', 'message': 'no shared audio data available'}), 504
-            sample_path = '/tmp/audio_probe.bin'
+            sample_path = _AUDIO_PROBE_PATH
             with open(sample_path, 'wb') as handle:
                 handle.write(data)
             return jsonify({'status': 'ok', 'bytes': len(data), 'source': 'waterfall'})
@@ -337,7 +343,7 @@ def audio_probe() -> Response:
     if not _state.audio_process or not _state.audio_process.stdout:
         return jsonify({'status': 'error', 'message': 'audio process not running'}), 400
 
-    sample_path = '/tmp/audio_probe.bin'
+    sample_path = _AUDIO_PROBE_PATH
     size = 0
     try:
         ready, _, _ = select.select([_state.audio_process.stdout], [], [], 2.0)

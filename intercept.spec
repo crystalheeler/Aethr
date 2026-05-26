@@ -32,6 +32,12 @@ hidden_imports = [
     # Windows-native BLE backend pulled by bleak at runtime:
     "winrt.windows.devices.bluetooth",
     "winrt.windows.devices.bluetooth.advertisement",
+    # Windows runtime: Werkzeug make_server (already a dep via Flask) + pystray.
+    "windows_runtime",
+    "pystray",
+    "pystray._win32",  # Windows backend; pystray is multi-backend by default
+    "PIL.Image",
+    "PIL.ImageDraw",
 ]
 
 datas = [
@@ -91,7 +97,7 @@ exe = EXE(
     upx=False,  # UPX often triggers antivirus false positives
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # Keep a console so server logs are visible
+    console=False,  # Windowed mode — no console window, tray icon owns the UX
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

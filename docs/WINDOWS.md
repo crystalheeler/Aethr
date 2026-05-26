@@ -15,9 +15,18 @@ install required.
 4. Install the WinUSB driver via **Zadig** (one-time, required — see below).
 5. Double-click `intercept.exe`.
 
-A console window opens, the Flask server starts, then point your browser at
-<http://localhost:6969>. Default login is `admin` / `admin` (change it in
-Settings).
+No console window appears. After ~10-15 seconds (Windows Defender scans the
+exe, PyInstaller unpacks the bundled runtime), three things happen:
+
+1. A small INTERCEPT tray icon appears in your taskbar's notification area.
+2. Your default browser opens to <http://localhost:6969>.
+3. The Werkzeug HTTP server is running in the background.
+
+Default login is `admin` / `admin` (change it in Settings → Users).
+
+**To quit:** right-click the tray icon → **Quit**. This cleanly shuts down
+the HTTP server and any spawned SDR subprocesses. Closing only the browser
+does NOT stop the server — use the tray icon.
 
 ## Zadig — install the WinUSB driver
 
@@ -46,6 +55,16 @@ directory each launch.
 Windows Firewall will prompt for network access on first launch. INTERCEPT
 serves locally on port 6969 — **Private networks** is enough. **Public
 networks** is fine to leave unchecked.
+
+## Logs
+
+Since there's no console, runtime logs go to:
+
+```
+%LOCALAPPDATA%\INTERCEPT\logs\intercept.log
+```
+
+Paste the full path into the Run dialog (Win+R) to open the folder.
 
 ## What works on Windows
 
@@ -110,6 +129,23 @@ Pass `--port 5099` (or any free port) when launching from a terminal:
 ```
 intercept.exe --port 5099
 ```
+
+### Tray icon doesn't appear
+
+Sometimes Windows hides new tray icons by default. Click the upward chevron
+(`^`) in your notification area to see hidden icons. Drag it to the visible
+section if you want it pinned. If it's truly not there, check
+`%LOCALAPPDATA%\INTERCEPT\logs\intercept.log` for startup errors.
+
+### Debugging without a console
+
+The Windows exe is built with `console=False`, so stdout/stderr go nowhere
+visible. Logs land in `%LOCALAPPDATA%\INTERCEPT\logs\intercept.log` — open
+the folder by pasting that path into the Run dialog (Win+R).
+
+If you need a true live console for development, build a debug exe yourself
+with `console=True` in `intercept.spec` (one-line change in the `EXE(...)`
+block).
 
 ### Logs
 
