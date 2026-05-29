@@ -30,6 +30,7 @@ from utils.constants import (
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
 )
+from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.flight_correlator import get_flight_correlator
 from utils.logging import sensor_logger as logger
@@ -44,23 +45,22 @@ acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
 @acars_bp.before_request
 def _gate_acars_on_windows():
-    """Gate ACARS on Windows: there's no Windows build of acarsdec.
+    """Gate ACARS on Windows only if no acarsdec binary is available.
 
-    The route code itself is Windows-compatible (the pty path is macOS-only;
-    everything else uses portable subprocess.PIPE) — the only blocker is the
-    missing decoder binary. Once a Windows acarsdec is bundled in
-    tools/windows/, this gate can be relaxed to check for the binary.
+    A Windows acarsdec (f00b4r0 fork, cross-built with MSYS2) now ships in
+    tools/windows/acarsdec/, so the mode works. The route's pty usage is
+    macOS-only; the Windows/Linux path uses subprocess.PIPE. If the binary is
+    somehow absent, surface a clean 503 instead of a raw failure.
     """
     from flask import jsonify, request
 
     from utils.platform import IS_WINDOWS, windows_not_supported_response
 
-    if IS_WINDOWS and request.method == 'POST':
+    if IS_WINDOWS and request.method == 'POST' and find_acarsdec() is None:
         body, status = windows_not_supported_response(
             "ACARS aircraft messaging",
-            "acarsdec has no official Windows build, so the VHF ACARS decoder "
-            "isn't bundled yet. Run INTERCEPT on Linux (or via Docker) for this "
-            "feature.",
+            "No acarsdec binary found. The bundled Windows build should live in "
+            "tools/windows/acarsdec/ — reinstall intercept.exe if this persists.",
         )
         return jsonify(body), status
     return None
@@ -85,8 +85,8 @@ acars_active_sdr_type: str | None = None
 
 
 def find_acarsdec():
-    """Find acarsdec binary."""
-    return shutil.which('acarsdec')
+    """Find acarsdec binary (checks bundled tools/windows/acarsdec/ on Windows)."""
+    return get_tool_path('acarsdec')
 
 
 def get_acarsdec_json_flag(acarsdec_path: str) -> str:
