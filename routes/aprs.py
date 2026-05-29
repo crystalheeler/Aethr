@@ -33,6 +33,7 @@ from utils.constants import (
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
 )
+from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.logging import sensor_logger as logger
 from utils.responses import api_error, api_success
@@ -110,28 +111,28 @@ METER_MIN_CHANGE = 2  # Only send if level changes by at least this much
 
 
 def find_direwolf() -> str | None:
-    """Find direwolf binary."""
-    return shutil.which('direwolf')
+    """Find direwolf binary (checks bundled tools/windows/ first on Windows)."""
+    return get_tool_path('direwolf')
 
 
 def find_multimon_ng() -> str | None:
-    """Find multimon-ng binary."""
-    return shutil.which('multimon-ng')
+    """Find multimon-ng binary (checks bundled tools/windows/ first on Windows)."""
+    return get_tool_path('multimon-ng')
 
 
 def find_rtl_fm() -> str | None:
     """Find rtl_fm binary."""
-    return shutil.which('rtl_fm')
+    return get_tool_path('rtl_fm')
 
 
 def find_rx_fm() -> str | None:
     """Find SoapySDR rx_fm binary."""
-    return shutil.which('rx_fm')
+    return get_tool_path('rx_fm')
 
 
 def find_rtl_power() -> str | None:
     """Find rtl_power binary for spectrum scanning."""
-    return shutil.which('rtl_power')
+    return get_tool_path('rtl_power')
 
 
 # Path to direwolf config file
