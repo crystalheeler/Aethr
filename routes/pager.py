@@ -46,17 +46,22 @@ pager_bp = Blueprint('pager', __name__)
 
 @pager_bp.before_request
 def _gate_pager_on_windows():
-    """Pager mode uses pty.openpty() to demux rtl_fm → multimon-ng output, and
-    multimon-ng has no Windows binary release. Both blockers — gate POSTs."""
+    """Gate Pager on Windows only if no multimon-ng binary is available.
+
+    A Windows multimon-ng (cross-built with MSYS2) now ships in
+    tools/windows/, and the pty demux was refactored to a cross-platform
+    pipe (see utils.process.spawn_line_buffered_decoder), so Pager works on
+    Windows. Surface a clean 503 only if the binary is somehow missing.
+    """
     from flask import jsonify, request
 
     from utils.platform import IS_WINDOWS, windows_not_supported_response
 
-    if IS_WINDOWS and request.method == 'POST':
+    if IS_WINDOWS and request.method == 'POST' and get_tool_path('multimon-ng') is None:
         body, status = windows_not_supported_response(
             "Pager (POCSAG/FLEX) decoding",
-            "multimon-ng has no official Windows binary release and the route "
-            "uses POSIX pty pipes that don't exist on Windows.",
+            "No multimon-ng binary found. The bundled Windows build should ship "
+            "in tools/windows/ — reinstall intercept.exe if this persists.",
         )
         return jsonify(body), status
     return None
