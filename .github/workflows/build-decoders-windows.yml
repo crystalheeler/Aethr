@@ -125,3 +125,144 @@ jobs:
           name: acarsdec-windows-x64
           path: acarsdec-dist/
           retention-days: 14
+
+  multimon-ng:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Set up MSYS2 (MINGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            base-devel
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+
+      - name: Build multimon-ng
+        run: |
+          set -euo pipefail
+          # multimon-ng reads audio from stdin (no SDR dependency); X11 and
+          # PulseAudio auto-disable on Windows. It's fairly portable, so try a
+          # plain build first.
+          git clone --depth 1 https://github.com/EliasOenal/multimon-ng.git
+          cd multimon-ng
+          mkdir build && cd build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+          ninja -v
+
+      - name: Collect binary + runtime DLLs
+        run: |
+          set -uo pipefail
+          OUT="$GITHUB_WORKSPACE/multimon-ng-dist"
+          mkdir -p "$OUT"
+          cp multimon-ng/build/multimon-ng.exe "$OUT/"
+          ldd "$OUT/multimon-ng.exe" | awk '/mingw64/ {print $3}' | while read -r dll; do
+            [ -f "$dll" ] && cp -n "$dll" "$OUT/" || true
+          done
+          echo "=== bundled files ==="; ls -la "$OUT"
+          echo "=== ldd ==="; ldd "$OUT/multimon-ng.exe" || true
+
+      - name: Smoke-test the binary
+        run: |
+          set -uo pipefail
+          ./multimon-ng-dist/multimon-ng.exe -h 2>&1 | head -8 || true
+          echo "exit: smoke complete"
+
+      - name: Upload multimon-ng artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: multimon-ng-windows-x64
+          path: multimon-ng-dist/
+          retention-days: 14
+
+  dumpvdl2:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout (for wincompat shims)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up MSYS2 (MINGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            base-devel
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-glib2
+            mingw-w64-x86_64-rtl-sdr
+            mingw-w64-x86_64-libxml2
+            mingw-w64-x86_64-zlib
+
+      - name: Build libacars
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/szpajder/libacars.git
+          cd libacars
+          mkdir build && cd build
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+            ..
+          ninja
+          ninja install
+
+      - name: Build dumpvdl2
+        run: |
+          set -euo pipefail
+          WINCOMPAT="$(cygpath -m "$GITHUB_WORKSPACE")/tools/windows/wincompat"
+          git clone --depth 1 https://github.com/szpajder/dumpvdl2.git
+          cd dumpvdl2
+          mkdir build && cd build
+          # Reuse the same POSIX shims acarsdec needed (sockets→Winsock,
+          # err.h, gmtime_r, etc.); glib + libacars + librtlsdr come from
+          # mingw / the libacars build above. Link ws2_32 last.
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-I${WINCOMPAT} -include ${WINCOMPAT}/win_posix_compat.h" \
+            -DCMAKE_C_STANDARD_LIBRARIES="-lws2_32" \
+            ..
+          ninja -v
+
+      - name: Collect binary + runtime DLLs
+        run: |
+          set -uo pipefail
+          OUT="$GITHUB_WORKSPACE/dumpvdl2-dist"
+          mkdir -p "$OUT"
+          cp dumpvdl2/build/dumpvdl2.exe "$OUT/"
+          cp "$MINGW_PREFIX/bin/libacars-2.dll" "$OUT/" 2>/dev/null || true
+          ldd "$OUT/dumpvdl2.exe" | awk '/mingw64/ {print $3}' | while read -r dll; do
+            [ -f "$dll" ] && cp -n "$dll" "$OUT/" || true
+          done
+          echo "=== bundled files ==="; ls -la "$OUT"
+          echo "=== ldd ==="; ldd "$OUT/dumpvdl2.exe" || true
+
+      - name: Smoke-test the binary
+        run: |
+          set -uo pipefail
+          ./dumpvdl2-dist/dumpvdl2.exe --version 2>&1 | head -8 || true
+          ./dumpvdl2-dist/dumpvdl2.exe 2>&1 | head -8 || true
+          echo "exit: smoke complete"
+
+      - name: Upload dumpvdl2 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dumpvdl2-windows-x64
+          path: dumpvdl2-dist/
+          retention-days: 14
