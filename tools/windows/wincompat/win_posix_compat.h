@@ -54,10 +54,19 @@ static __attribute__((unused)) char *strsignal(int sig)
 }
 
 /* gmtime_r(3) — POSIX reentrant variant; mingw only ships gmtime_s (swapped
- * argument order and a different return convention). */
-static __attribute__((unused)) struct tm *gmtime_r(const time_t *timep, struct tm *result)
+ * argument order and a different return convention).
+ *
+ * acarsdec calls this as gmtime_r(&tv.tv_sec, ...) where tv is a
+ * struct timeval. On mingw/Winsock, timeval.tv_sec is a 32-bit `long`, but
+ * time_t is 64-bit — so we take `const long *` to match the caller exactly
+ * and widen to time_t before handing off to gmtime_s. (Declaring time_t*
+ * here would both fail to compile AND, if forced, make gmtime_s read 8 bytes
+ * from a 4-byte field — i.e. garbage timestamps.) */
+static __attribute__((unused)) struct tm *gmtime_r(const long *timep, struct tm *result)
 {
-	if (gmtime_s(result, timep) != 0)
+	time_t t = (time_t)(*timep);
+
+	if (gmtime_s(result, &t) != 0)
 		return NULL;
 	return result;
 }
