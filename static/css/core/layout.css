@@ -692,6 +692,44 @@
         height: 44px;
     }
 }
+/* NOTE: we deliberately do NOT put overflow-x: auto / overflow-y: hidden
+   on .mode-nav. The dropdown menus (.mode-nav-dropdown-menu) are
+   absolutely positioned BELOW the nav row; any clipping on .mode-nav's
+   Y-axis hides them entirely and the dropdown buttons appear dead. The
+   body has overflow-x: hidden so any horizontal overflow here is
+   silently clipped at the page edge — the compact-mode @media block
+   below saves enough width that this almost never matters. */
+
+/* Compact-mode tweaks for ~1024–1500px screens: hide verbose text labels
+   on the utility cluster so all the dropdowns + tool icons fit without
+   forcing the nav into its internal scroll. Above 1500px we have plenty
+   of room for everything. */
+@media (min-width: 1024px) and (max-width: 1500px) {
+    .mode-nav {
+        gap: 4px;
+        padding: 0 12px;
+    }
+    .mode-nav-dropdown-btn,
+    .mode-nav-btn {
+        padding: 8px 10px;
+    }
+    .nav-utilities {
+        gap: 8px;
+    }
+    .nav-tools {
+        gap: 4px;
+    }
+    /* Drop wordy labels — icons remain. */
+    .nav-clock .utc-label,
+    .nav-dashboard-btn .nav-label,
+    .nav-tier-btn .tier-label-lean,
+    .nav-tier-btn .tier-label-enhanced {
+        display: none;
+    }
+    .nav-divider {
+        margin: 0 2px;
+    }
+}
 
 .mode-nav-group {
     display: flex;

@@ -81,6 +81,17 @@
     filter: none;
 }
 
+html {
+    /* Never let the whole document scroll horizontally. The mode-nav
+       (which has many flex-shrink:0 utility icons) can exceed viewport
+       width on common 1366px laptop screens; without this, the entire
+       page gets a horizontal scrollbar and right-edge icons land
+       off-screen. The nav itself has its own internal overflow-x: auto
+       fallback (see .mode-nav in core/layout.css), so nothing gets
+       permanently clipped. */
+    overflow-x: hidden;
+}
+
 body {
     font-family: var(--font-sans);
     background-color: var(--bg-primary);
@@ -97,6 +108,7 @@ body {
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
 }
 
 /* ============================================
