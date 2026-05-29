@@ -56,20 +56,25 @@ static __attribute__((unused)) char *strsignal(int sig)
 /* gmtime_r(3) — POSIX reentrant variant; mingw only ships gmtime_s (swapped
  * argument order and a different return convention).
  *
- * acarsdec calls this as gmtime_r(&tv.tv_sec, ...) where tv is a
- * struct timeval. On mingw/Winsock, timeval.tv_sec is a 32-bit `long`, but
- * time_t is 64-bit — so we take `const long *` to match the caller exactly
- * and widen to time_t before handing off to gmtime_s. (Declaring time_t*
- * here would both fail to compile AND, if forced, make gmtime_s read 8 bytes
- * from a 4-byte field — i.e. garbage timestamps.) */
-static __attribute__((unused)) struct tm *gmtime_r(const long *timep, struct tm *result)
+ * Callers pass different pointer types: fileout.c uses &(time_t) (64-bit),
+ * while output.c uses &tv.tv_sec which on Winsock's struct timeval is a
+ * 32-bit long. No single fixed pointer-type signature matches both (GCC 14
+ * makes the mismatch a hard error). So gmtime_r is a macro that dereferences
+ * the argument and widens the value to time_t — type-agnostic and always
+ * correct (no over-reading a 4-byte field as 8 bytes). */
+static __attribute__((unused)) struct tm *_wincompat_gmtime_r(time_t t, struct tm *result)
 {
-	time_t t = (time_t)(*timep);
-
 	if (gmtime_s(result, &t) != 0)
 		return NULL;
 	return result;
 }
+#define gmtime_r(timep, result) _wincompat_gmtime_r((time_t)(*(timep)), (result))
+
+/* stpcpy(3) — GNU extension (strcpy that returns a pointer to the new NUL).
+ * Not declared by mingw <string.h>; map to the GCC builtin. */
+#ifndef stpcpy
+#define stpcpy __builtin_stpcpy
+#endif
 
 /* Minimal POSIX signal shim. Windows lacks sigaction()/sigemptyset()/SIGQUIT.
  * acarsdec only uses these to install a clean-shutdown handler; INTERCEPT
