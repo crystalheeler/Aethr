@@ -91,7 +91,7 @@ jobs:
             -DAIRSPY=OFF \
             -DSDRPLAY=OFF \
             -DCMAKE_C_FLAGS="-I${WINCOMPAT} -include ${WINCOMPAT}/win_posix_compat.h -Dffs=__builtin_ffs" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lws2_32" \
+            -DCMAKE_C_STANDARD_LIBRARIES="-lws2_32" \
             ..
           ninja -v
 
