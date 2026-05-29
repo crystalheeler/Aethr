@@ -260,7 +260,8 @@ jobs:
           set -uo pipefail
           OUT="$GITHUB_WORKSPACE/dumpvdl2-dist"
           mkdir -p "$OUT"
-          cp dumpvdl2/build/dumpvdl2.exe "$OUT/"
+          # dumpvdl2's CMake puts the executable in build/src/, not build/.
+          cp dumpvdl2/build/src/dumpvdl2.exe "$OUT/"
           cp "$MINGW_PREFIX/bin/libacars-2.dll" "$OUT/" 2>/dev/null || true
           ldd "$OUT/dumpvdl2.exe" | awk '/mingw64/ {print $3}' | while read -r dll; do
             [ -f "$dll" ] && cp -n "$dll" "$OUT/" || true
