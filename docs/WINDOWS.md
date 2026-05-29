@@ -70,13 +70,13 @@ Paste the full path into the Run dialog (Win+R) to open the folder.
 
 | Mode | Status | Notes |
 |---|---|---|
-| **Pager (POCSAG/FLEX)** | ❌ Not available | multimon-ng has no Windows binary |
+| **Pager (POCSAG/FLEX)** | ✅ Works | bundled `multimon-ng.exe` (cross-built from source) |
 | **433 MHz sensors** | ✅ Works | bundled `rtl_433.exe` |
 | **ADS-B aircraft** | ⚠️ Limited | `dump1090` not bundled; works if installed system-wide |
 | **AIS vessels** | ✅ Works | bundled `AIS-catcher.exe` |
-| **ACARS** | ❌ Not available | acarsdec has no Windows binary |
-| **VDL2** | ❌ Not available | dumpvdl2 has no Windows binary |
-| **APRS** | ❌ Not available | direwolf ships Windows builds but isn't bundled yet; route also needs a pty→pipe rewrite |
+| **ACARS** | ✅ Works | bundled `acarsdec.exe` (cross-built from source) |
+| **VDL2** | ✅ Works | bundled `dumpvdl2.exe` (cross-built from source) |
+| **APRS** | ✅ Works | bundled `direwolf.exe` (official Windows build) |
 | **DSC (maritime distress)** | ❌ Not available | vendored Linux-only decoder |
 | **WiFi scanning** | ❌ Not available | Windows drivers don't support monitor mode |
 | **Bluetooth scanning** | ✅ Works | uses bleak + WinRT (native Windows BLE stack) |

@@ -15,10 +15,24 @@ import sys
 #     aa, bb, cc, …, zz     (doubled letter — 26 more)
 #     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
 # Each new upstream version resets the suffix back to "-a".
-VERSION = "2.27.0-b"
+VERSION = "2.27.0-c"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-c",
+        "date": "May 2026",
+        "highlights": [
+            "Feat: ACARS now works on Windows — bundled a from-source acarsdec.exe (cross-built with MSYS2/mingw)",
+            "Feat: VDL2 now works on Windows — bundled a from-source dumpvdl2.exe (glib + libacars)",
+            "Feat: Pager (POCSAG/FLEX) now works on Windows — bundled a from-source multimon-ng.exe",
+            "Feat: APRS now works on Windows — bundled direwolf's official Windows binary",
+            "Feat: Airband Listen works without ffmpeg (native rtl_fm PCM + WAV header)",
+            "Fix: APRS/Pager decoder I/O refactored from POSIX pty to a cross-platform pipe",
+            "Fix: correct several inaccurate 'not available on Windows' mode-gate messages",
+            "Fix: top-bar overflow / page horizontal scrollbar on ~1366px screens",
+        ],
+    },
     {
         "version": "2.27.0-b",
         "date": "May 2026",
