@@ -44,7 +44,13 @@ acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
 @acars_bp.before_request
 def _gate_acars_on_windows():
-    """ACARS uses acarsdec (no Windows binary) and POSIX pty pipes."""
+    """Gate ACARS on Windows: there's no Windows build of acarsdec.
+
+    The route code itself is Windows-compatible (the pty path is macOS-only;
+    everything else uses portable subprocess.PIPE) — the only blocker is the
+    missing decoder binary. Once a Windows acarsdec is bundled in
+    tools/windows/, this gate can be relaxed to check for the binary.
+    """
     from flask import jsonify, request
 
     from utils.platform import IS_WINDOWS, windows_not_supported_response
@@ -52,7 +58,9 @@ def _gate_acars_on_windows():
     if IS_WINDOWS and request.method == 'POST':
         body, status = windows_not_supported_response(
             "ACARS aircraft messaging",
-            "acarsdec has no Windows build and the route relies on POSIX pty pipes.",
+            "acarsdec has no official Windows build, so the VHF ACARS decoder "
+            "isn't bundled yet. Run INTERCEPT on Linux (or via Docker) for this "
+            "feature.",
         )
         return jsonify(body), status
     return None

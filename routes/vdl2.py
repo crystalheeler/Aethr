@@ -44,7 +44,14 @@ vdl2_bp = Blueprint('vdl2', __name__, url_prefix='/vdl2')
 
 @vdl2_bp.before_request
 def _gate_vdl2_on_windows():
-    """VDL2 uses dumpvdl2 (no Windows binary) and POSIX pty pipes."""
+    """Gate VDL2 on Windows: there's no Windows build of dumpvdl2.
+
+    The route code itself is Windows-compatible (the pty path is macOS-only;
+    everything else uses portable subprocess.PIPE) — the only blocker is the
+    missing decoder binary. dumpvdl2 also depends on glib, so a Windows build
+    is a bigger lift than acarsdec. Once one is bundled in tools/windows/,
+    this gate can be relaxed to check for the binary.
+    """
     from flask import jsonify, request
 
     from utils.platform import IS_WINDOWS, windows_not_supported_response
@@ -52,7 +59,9 @@ def _gate_vdl2_on_windows():
     if IS_WINDOWS and request.method == 'POST':
         body, status = windows_not_supported_response(
             "VDL2 aircraft datalink",
-            "dumpvdl2 has no Windows build and the route relies on POSIX pty pipes.",
+            "dumpvdl2 has no official Windows build, so the VDL Mode 2 decoder "
+            "isn't bundled yet. Run INTERCEPT on Linux (or via Docker) for this "
+            "feature.",
         )
         return jsonify(body), status
     return None

@@ -341,6 +341,29 @@ TOOL_DEPENDENCIES = {
             },
         },
     },
+    "listening_post": {
+        "name": "Audio Monitor (Airband / Scanner)",
+        "tools": {
+            "rtl_fm": {
+                "required": True,
+                "description": "RTL-SDR FM/AM demodulator for live audio",
+                "install": {
+                    "apt": "sudo apt install rtl-sdr",
+                    "brew": "brew install librtlsdr",
+                    "manual": "https://osmocom.org/projects/rtl-sdr/wiki",
+                },
+            },
+            "ffmpeg": {
+                "required": True,
+                "description": "Audio encoder — repackages demodulated PCM into streamable WAV",
+                "install": {
+                    "apt": "sudo apt install ffmpeg",
+                    "brew": "brew install ffmpeg",
+                    "manual": "https://ffmpeg.org/download.html",
+                },
+            },
+        },
+    },
     "aircraft": {
         "name": "Aircraft Tracking (ADS-B)",
         "tools": {

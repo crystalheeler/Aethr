@@ -26,6 +26,7 @@ from utils.constants import (
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
 )
+from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.logging import get_logger
 from utils.sdr import SDRFactory, SDRType
@@ -56,6 +57,12 @@ audio_frequency = 0.0
 audio_modulation = 'fm'
 audio_source = 'process'
 audio_start_token = 0
+# When True, audio_process is rtl_fm itself emitting raw PCM (no ffmpeg);
+# the /audio/stream endpoint prepends a WAV header and reads with blocking
+# reads. Set per-stream by _start_audio_stream. audio_sample_rate is the
+# PCM rate rtl_fm is emitting at, needed for the native WAV header.
+audio_wav_native = False
+audio_sample_rate = 48000
 
 # Scanner state
 scanner_thread: threading.Thread | None = None
@@ -123,22 +130,22 @@ VALID_MODULATIONS = ['fm', 'wfm', 'am', 'usb', 'lsb']
 
 def find_rtl_fm() -> str | None:
     """Find rtl_fm binary."""
-    return shutil.which('rtl_fm')
+    return get_tool_path('rtl_fm')
 
 
 def find_rtl_power() -> str | None:
     """Find rtl_power binary."""
-    return shutil.which('rtl_power')
+    return get_tool_path('rtl_power')
 
 
 def find_rx_fm() -> str | None:
     """Find rx_fm binary (SoapySDR FM demodulator for HackRF/Airspy/LimeSDR)."""
-    return shutil.which('rx_fm')
+    return get_tool_path('rx_fm')
 
 
 def find_ffmpeg() -> str | None:
     """Find ffmpeg for audio encoding."""
-    return shutil.which('ffmpeg')
+    return get_tool_path('ffmpeg')
 
 
 def normalize_modulation(value: str) -> str:
@@ -205,15 +212,22 @@ def _start_audio_stream(
 ):
     """Start audio streaming at given frequency."""
     global audio_process, audio_rtl_process, audio_running, audio_frequency, audio_modulation
+    global audio_wav_native, audio_sample_rate
 
     # Stop existing stream and snapshot config under lock
     with audio_lock:
         _stop_audio_stream_internal()
 
+        from utils.platform import IS_WINDOWS
+
         ffmpeg_path = find_ffmpeg()
-        if not ffmpeg_path:
-            logger.error("ffmpeg not found")
-            return
+        # On Windows we never use ffmpeg here: select() doesn't work on
+        # pipes there, and ffmpeg in this pipeline only resamples + adds a
+        # WAV header — both of which we do natively (rtl_fm's -r flag plus
+        # _wav_header()). On POSIX, keep using ffmpeg when present
+        # (unchanged behavior); fall back to the same native path when it
+        # isn't installed.
+        use_ffmpeg = bool(ffmpeg_path) and not IS_WINDOWS
 
         # Snapshot runtime tuning config so the spawned demod command cannot
         # drift if shared scanner_config changes while startup is in-flight.
@@ -279,23 +293,25 @@ def _start_audio_stream(
         )
         sdr_cmd[0] = rx_fm_path
 
-    encoder_cmd = [
-        ffmpeg_path,
-        '-hide_banner',
-        '-loglevel', 'error',
-        '-fflags', 'nobuffer',
-        '-flags', 'low_delay',
-        '-probesize', '32',
-        '-analyzeduration', '0',
-        '-f', 's16le',
-        '-ar', str(resample_rate),
-        '-ac', '1',
-        '-i', 'pipe:0',
-        '-acodec', 'pcm_s16le',
-        '-ar', '44100',
-        '-f', 'wav',
-        'pipe:1'
-    ]
+    encoder_cmd = None
+    if use_ffmpeg:
+        encoder_cmd = [
+            ffmpeg_path,
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+            '-probesize', '32',
+            '-analyzeduration', '0',
+            '-f', 's16le',
+            '-ar', str(resample_rate),
+            '-ac', '1',
+            '-i', 'pipe:0',
+            '-acodec', 'pcm_s16le',
+            '-ar', '44100',
+            '-f', 'wav',
+            'pipe:1'
+        ]
 
     # Retry loop outside lock — spawning + health check sleeps don't block
     # other operations. audio_start_lock already serializes callers.
@@ -316,7 +332,6 @@ def _start_audio_stream(
             ffmpeg_err_handle = None
             try:
                 rtl_err_handle = open(rtl_stderr_log, 'w')
-                ffmpeg_err_handle = open(ffmpeg_stderr_log, 'w')
                 new_rtl_proc = subprocess.Popen(
                     sdr_cmd,
                     stdout=subprocess.PIPE,
@@ -324,16 +339,25 @@ def _start_audio_stream(
                     bufsize=0,
                     start_new_session=True
                 )
-                new_audio_proc = subprocess.Popen(
-                    encoder_cmd,
-                    stdin=new_rtl_proc.stdout,
-                    stdout=subprocess.PIPE,
-                    stderr=ffmpeg_err_handle,
-                    bufsize=0,
-                    start_new_session=True
-                )
-                if new_rtl_proc.stdout:
-                    new_rtl_proc.stdout.close()
+                if use_ffmpeg:
+                    ffmpeg_err_handle = open(ffmpeg_stderr_log, 'w')
+                    new_audio_proc = subprocess.Popen(
+                        encoder_cmd,
+                        stdin=new_rtl_proc.stdout,
+                        stdout=subprocess.PIPE,
+                        stderr=ffmpeg_err_handle,
+                        bufsize=0,
+                        start_new_session=True
+                    )
+                    # ffmpeg now owns the rtl_fm stdout pipe.
+                    if new_rtl_proc.stdout:
+                        new_rtl_proc.stdout.close()
+                else:
+                    # Native path: no ffmpeg. Stream rtl_fm's raw PCM
+                    # directly; the /audio/stream endpoint prepends the WAV
+                    # header. audio_process and audio_rtl_process both point
+                    # at the rtl_fm process (harmless to terminate twice).
+                    new_audio_proc = new_rtl_proc
             finally:
                 if rtl_err_handle:
                     rtl_err_handle.close()
@@ -429,7 +453,15 @@ def _start_audio_stream(
             audio_running = True
             audio_frequency = frequency
             audio_modulation = modulation
-            logger.info(f"Audio stream started: {frequency} MHz ({modulation}) via {resolved_sdr_type.value}")
+            # Native path streams rtl_fm PCM at resample_rate; the stream
+            # endpoint must prepend a WAV header at that exact rate.
+            audio_wav_native = not use_ffmpeg
+            audio_sample_rate = resample_rate
+            logger.info(
+                f"Audio stream started: {frequency} MHz ({modulation}) via "
+                f"{resolved_sdr_type.value} "
+                f"[{'native PCM' if audio_wav_native else 'ffmpeg'}]"
+            )
 
     except Exception as e:
         logger.error(f"Failed to start audio stream: {e}")

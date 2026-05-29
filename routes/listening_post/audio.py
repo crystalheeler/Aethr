@@ -439,6 +439,47 @@ def stream_audio() -> Response:
     if not _state.audio_running or not _state.audio_process:
         return Response(b'', mimetype='audio/wav', status=204)
 
+    # Native path (Windows, or POSIX without ffmpeg): audio_process is
+    # rtl_fm emitting raw headerless PCM. We prepend the WAV header
+    # ourselves and read with blocking reads — select() doesn't work on
+    # pipes on Windows.
+    if _state.audio_wav_native:
+        native_rate = int(_state.audio_sample_rate or 48000)
+
+        def generate_native():
+            proc = _state.audio_process
+            if not proc or not proc.stdout:
+                return
+            # Browser expects an immediate WAV header.
+            yield _wav_header(sample_rate=native_rate)
+            try:
+                while _state.audio_running and proc.poll() is None:
+                    if request_token is not None and request_token < _state.audio_start_token:
+                        break
+                    # Blocking read — a live demod stream always produces
+                    # data shortly (rtl_fm emits silence below squelch, so
+                    # bytes keep flowing). Returns b'' when the pipe closes
+                    # on process exit, which ends the generator.
+                    chunk = proc.stdout.read(4096)
+                    if not chunk:
+                        break
+                    yield chunk
+            except GeneratorExit:
+                pass
+            except Exception as e:
+                logger.error(f"Native audio stream error: {e}")
+
+        return Response(
+            generate_native(),
+            mimetype='audio/wav',
+            headers={
+                'Content-Type': 'audio/wav',
+                'Cache-Control': 'no-cache, no-store',
+                'X-Accel-Buffering': 'no',
+                'Transfer-Encoding': 'chunked',
+            }
+        )
+
     def generate():
         # Capture local reference to avoid race condition with stop
         proc = _state.audio_process
