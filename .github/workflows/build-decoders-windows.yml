@@ -132,6 +132,11 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
+      - name: Checkout (for wincompat shims)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Set up MSYS2 (MINGW64)
         uses: msys2/setup-msys2@v2
         with:
@@ -148,13 +153,23 @@ jobs:
       - name: Build multimon-ng
         run: |
           set -euo pipefail
-          # multimon-ng reads audio from stdin (no SDR dependency); X11 and
-          # PulseAudio auto-disable on Windows. It's fairly portable, so try a
-          # plain build first.
+          WINCOMPAT="$(cygpath -m "$GITHUB_WORKSPACE")/tools/windows/wincompat"
           git clone --depth 1 https://github.com/EliasOenal/multimon-ng.git
           cd multimon-ng
+          # multimon-ng forces project(... CXX) on any Windows because MSVC's
+          # C compiler lacks C99. We're mingw (gcc), whose C compiler is fine —
+          # enable C so the .c sources actually compile (CXX-only left the
+          # target with zero objects and ninja built nothing).
+          sed -i 's/project( multimon-ng CXX )/project( multimon-ng C CXX )/' CMakeLists.txt
           mkdir build && cd build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+          # multimon-ng reads audio from stdin (-DONLY_RAW on Windows), no SDR
+          # dependency. wincompat covers any POSIX gaps; -lwinmm for the Windows
+          # audio stub it still links.
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-I${WINCOMPAT} -include ${WINCOMPAT}/win_posix_compat.h" \
+            -DCMAKE_C_STANDARD_LIBRARIES="-lws2_32 -lwinmm" \
+            ..
           ninja -v
 
       - name: Collect binary + runtime DLLs

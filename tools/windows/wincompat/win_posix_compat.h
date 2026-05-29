@@ -46,6 +46,19 @@ static __attribute__((unused)) char *strsep(char **stringp, const char *delim)
 	return start;
 }
 
+/* strndup(3) — POSIX/GNU; not declared by mingw <string.h> in this config. */
+static __attribute__((unused)) char *strndup(const char *s, size_t n)
+{
+	size_t len = strnlen(s, n);
+	char *p = (char *)malloc(len + 1);
+
+	if (p) {
+		memcpy(p, s, len);
+		p[len] = '\0';
+	}
+	return p;
+}
+
 /* strsignal(3) — absent from mingw; a generic label is enough here. */
 static __attribute__((unused)) char *strsignal(int sig)
 {
@@ -70,6 +83,24 @@ static __attribute__((unused)) struct tm *_wincompat_gmtime_r(time_t t, struct t
 }
 #define gmtime_r(timep, result) _wincompat_gmtime_r((time_t)(*(timep)), (result))
 
+/* gmtime(3) / localtime(3) — dumpvdl2 passes &tv.tv_sec (Winsock 32-bit long)
+ * to these, mismatching the const time_t* (64-bit) prototype (hard error under
+ * GCC 14). Wrap as macros that widen the value to time_t and use the reentrant
+ * *_s variants into a per-translation-unit static buffer (matching the
+ * static-storage semantics of the originals). <time.h> is already included
+ * above, so the real prototypes were processed before these macros. */
+static __attribute__((unused)) struct tm _wincompat_tm_buf;
+static __attribute__((unused)) struct tm *_wincompat_gmtime(time_t t)
+{
+	return (gmtime_s(&_wincompat_tm_buf, &t) == 0) ? &_wincompat_tm_buf : NULL;
+}
+static __attribute__((unused)) struct tm *_wincompat_localtime(time_t t)
+{
+	return (localtime_s(&_wincompat_tm_buf, &t) == 0) ? &_wincompat_tm_buf : NULL;
+}
+#define gmtime(timep)    _wincompat_gmtime((time_t)(*(timep)))
+#define localtime(timep) _wincompat_localtime((time_t)(*(timep)))
+
 /* stpcpy(3) — GNU extension (strcpy that returns a pointer to the new NUL).
  * Not declared by mingw <string.h>; map to the GCC builtin. */
 #ifndef stpcpy
@@ -82,6 +113,15 @@ static __attribute__((unused)) struct tm *_wincompat_gmtime_r(time_t t, struct t
  * signal() (and ignoring SIGQUIT, which Windows never raises) is sufficient. */
 #ifndef SIGQUIT
 #define SIGQUIT 3
+#endif
+/* Other POSIX signals Windows doesn't define. The values match POSIX; the
+ * sigaction shim maps handlers to signal(), and Windows never raises these,
+ * so registering for them is a harmless no-op. */
+#ifndef SIGHUP
+#define SIGHUP 1
+#endif
+#ifndef SIGPIPE
+#define SIGPIPE 13
 #endif
 
 struct sigaction {
