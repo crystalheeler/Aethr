@@ -16,11 +16,122 @@ from typing import Any
 from .dependencies import check_tool
 from .platform import IS_WINDOWS, kill_processes_by_name, terminate_process_tree
 
+try:
+    import pty as _pty
+except ImportError:  # Windows: pty requires termios, which doesn't exist there
+    _pty = None  # type: ignore[assignment]
+
 logger = logging.getLogger('intercept.process')
 
 # Track all spawned processes for cleanup
 _spawned_processes: list[subprocess.Popen] = []
 _process_lock = threading.Lock()
+
+
+def spawn_line_buffered_decoder(
+    cmd: list[str],
+    *,
+    stdin: Any,
+    close_fds: bool = True,
+    start_new_session: bool = False,
+) -> tuple[subprocess.Popen, Any]:
+    """Spawn a decoder whose combined stdout+stderr we read line by line.
+
+    Sparse decoders (multimon-ng, direwolf) line-buffer their stdout only when
+    it's a TTY; against a plain pipe their libc full-buffers (~4-8 KB), which
+    delays low-rate output (a single APRS/pager line) for minutes.
+
+    POSIX: route stdout+stderr through a pty so the child sees a TTY and
+    line-buffers. Returns ``(process, master_fd)`` where master_fd is an int.
+
+    Windows: pty doesn't exist; combine stdout+stderr into one pipe. Returns
+    ``(process, process.stdout)``. (Buffering then depends on the decoder;
+    direwolf flushes per frame, so APRS is fine.)
+
+    Pair the returned source with :func:`read_decoder_lines`.
+    """
+    if _pty is not None:
+        master_fd, slave_fd = _pty.openpty()
+        popen_kwargs: dict[str, Any] = dict(
+            stdin=stdin, stdout=slave_fd, stderr=slave_fd, close_fds=close_fds
+        )
+        if start_new_session:
+            popen_kwargs["start_new_session"] = True
+        process = subprocess.Popen(cmd, **popen_kwargs)
+        os.close(slave_fd)  # child owns the slave end now
+        return process, master_fd
+
+    # Windows: no pty — combined stdout/stderr pipe, unbuffered on our side.
+    process = subprocess.Popen(
+        cmd,
+        stdin=stdin,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+        close_fds=close_fds,
+    )
+    return process, process.stdout
+
+
+def read_decoder_lines(source: Any, process: subprocess.Popen | None = None, timeout: float = 1.0):
+    """Yield decoded, stripped, non-empty text lines from a decoder's output.
+
+    ``source`` is whatever :func:`spawn_line_buffered_decoder` returned:
+
+      * an int — a POSIX pty master fd, polled with ``select()`` + ``os.read()``
+        (matches the long-standing pager/APRS behavior); or
+      * a binary file object — e.g. ``process.stdout`` on Windows, drained with
+        blocking ``readline()`` (``select()`` doesn't work on Windows pipes).
+
+    Stops at EOF, or — on POSIX — once ``process`` has exited.
+    """
+    if isinstance(source, int):
+        import select
+
+        buffer = ""
+        while True:
+            try:
+                ready, _, _ = select.select([source], [], [], timeout)
+            except Exception:
+                break
+            if ready:
+                try:
+                    data = os.read(source, 1024)
+                except OSError:
+                    break
+                if not data:
+                    break
+                buffer += data.decode("utf-8", errors="replace")
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+                    if line:
+                        yield line
+            if process is not None and process.poll() is not None:
+                break
+        return
+
+    # Windows pipe: blocking readline; returns b'' (EOF) when the child exits.
+    while True:
+        try:
+            raw = source.readline()
+        except (OSError, ValueError):
+            break
+        if not raw:
+            break
+        line = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw
+        line = line.strip()
+        if line:
+            yield line
+
+
+def close_decoder_source(source: Any) -> None:
+    """Close the source returned by :func:`spawn_line_buffered_decoder`."""
+    with contextlib.suppress(Exception):
+        if isinstance(source, int):
+            os.close(source)
+        elif source is not None:
+            source.close()
 
 
 def register_process(process: subprocess.Popen) -> None:

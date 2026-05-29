@@ -8,13 +8,7 @@ import os
 import pathlib
 import queue
 
-try:
-    import pty
-except ImportError:  # Windows: pty unavailable (requires termios)
-    pty = None  # type: ignore[assignment]
-
 import re
-import select
 import struct
 import subprocess
 import threading
@@ -28,7 +22,13 @@ import app as app_module
 from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.logging import pager_logger as logger
-from utils.process import register_process, unregister_process
+from utils.process import (
+    close_decoder_source,
+    read_decoder_lines,
+    register_process,
+    spawn_line_buffered_decoder,
+    unregister_process,
+)
 from utils.responses import api_error
 from utils.sdr import SDRFactory, SDRType
 from utils.sse import sse_stream_fanout
@@ -222,50 +222,30 @@ def audio_relay_thread(
             multimon_stdin.close()
 
 
-def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
-    """Stream decoder output to queue using PTY for unbuffered output."""
+def stream_decoder(source, process: subprocess.Popen[bytes]) -> None:
+    """Stream decoder output to the queue, line by line.
+
+    ``source`` is whatever spawn_line_buffered_decoder returned: a POSIX pty
+    master fd (line-buffered via the child's TTY) or, on Windows, the decoder's
+    stdout pipe. read_decoder_lines abstracts the platform difference.
+    """
     try:
         app_module.output_queue.put({'type': 'status', 'text': 'started'})
 
-        buffer = ""
-        while True:
-            try:
-                ready, _, _ = select.select([master_fd], [], [], 1.0)
-            except Exception:
-                break
-
-            if ready:
-                try:
-                    data = os.read(master_fd, 1024)
-                    if not data:
-                        break
-                    buffer += data.decode('utf-8', errors='replace')
-
-                    while '\n' in buffer:
-                        line, buffer = buffer.split('\n', 1)
-                        line = line.strip()
-                        if not line:
-                            continue
-
-                        parsed = parse_multimon_output(line)
-                        if parsed:
-                            parsed['timestamp'] = datetime.now().strftime('%H:%M:%S')
-                            app_module.output_queue.put({'type': 'message', **parsed})
-                            log_message(parsed)
-                        else:
-                            app_module.output_queue.put({'type': 'raw', 'text': line})
-                except OSError:
-                    break
-
-            if process.poll() is not None:
-                break
+        for line in read_decoder_lines(source, process):
+            parsed = parse_multimon_output(line)
+            if parsed:
+                parsed['timestamp'] = datetime.now().strftime('%H:%M:%S')
+                app_module.output_queue.put({'type': 'message', **parsed})
+                log_message(parsed)
+            else:
+                app_module.output_queue.put({'type': 'raw', 'text': line})
 
     except Exception as e:
         app_module.output_queue.put({'type': 'error', 'text': str(e)})
     finally:
         global pager_active_device, pager_active_sdr_type
-        with contextlib.suppress(OSError):
-            os.close(master_fd)
+        close_decoder_source(source)
         # Signal relay thread to stop
         with app_module.process_lock:
             stop_relay = getattr(app_module.current_process, '_stop_relay', None)
@@ -432,19 +412,16 @@ def start_decoding() -> Response:
             rtl_stderr_thread.daemon = True
             rtl_stderr_thread.start()
 
-            # Create a pseudo-terminal for multimon-ng output
-            master_fd, slave_fd = pty.openpty()
-
-            multimon_process = subprocess.Popen(
+            # Spawn multimon-ng with a PIPE stdin (the relay thread feeds it
+            # rtl_fm audio). On POSIX its stdout/stderr go through a pty so it
+            # line-buffers; on Windows a combined pipe is used. `source` is
+            # what stream_decoder reads from.
+            multimon_process, source = spawn_line_buffered_decoder(
                 multimon_cmd,
                 stdin=subprocess.PIPE,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                close_fds=True
+                close_fds=True,
             )
             register_process(multimon_process)
-
-            os.close(slave_fd)
 
             # Spawn audio relay thread between rtl_fm and multimon-ng
             stop_relay = threading.Event()
@@ -458,12 +435,12 @@ def start_decoding() -> Response:
 
             app_module.current_process = multimon_process
             app_module.current_process._rtl_process = rtl_process
-            app_module.current_process._master_fd = master_fd
+            app_module.current_process._master_fd = source
             app_module.current_process._stop_relay = stop_relay
             app_module.current_process._relay_thread = relay
 
-            # Start output thread with PTY master fd
-            thread = threading.Thread(target=stream_decoder, args=(master_fd, multimon_process))
+            # Start output thread reading the decoder's output source
+            thread = threading.Thread(target=stream_decoder, args=(source, multimon_process))
             thread.daemon = True
             thread.start()
 
@@ -520,10 +497,10 @@ def stop_decoding() -> Response:
                     with contextlib.suppress(OSError):
                         app_module.current_process._rtl_process.kill()
 
-            # Close PTY master fd
+            # Close the decoder output source (pty master fd on POSIX, stdout
+            # pipe on Windows)
             if hasattr(app_module.current_process, '_master_fd'):
-                with contextlib.suppress(OSError):
-                    os.close(app_module.current_process._master_fd)
+                close_decoder_source(app_module.current_process._master_fd)
 
             # Kill multimon-ng
             app_module.current_process.terminate()

@@ -8,13 +8,7 @@ import json
 import os
 import queue
 
-try:
-    import pty
-except ImportError:  # Windows: pty unavailable (requires termios)
-    pty = None  # type: ignore[assignment]
-
 import re
-import select
 import shutil
 import subprocess
 import tempfile
@@ -36,6 +30,11 @@ from utils.constants import (
 from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.logging import sensor_logger as logger
+from utils.process import (
+    close_decoder_source,
+    read_decoder_lines,
+    spawn_line_buffered_decoder,
+)
 from utils.responses import api_error, api_success
 from utils.sdr import SDRFactory, SDRType
 from utils.sse import sse_stream_fanout
@@ -1485,12 +1484,12 @@ def should_send_meter_update(level: int) -> bool:
     return False
 
 
-def stream_aprs_output(master_fd: int, rtl_process: subprocess.Popen, decoder_process: subprocess.Popen) -> None:
+def stream_aprs_output(source, rtl_process: subprocess.Popen, decoder_process: subprocess.Popen) -> None:
     """Stream decoded APRS packets and audio level meter to queue.
 
-    Reads from a PTY master fd to get line-buffered output from the decoder,
-    avoiding the 15-minute pipe buffering delay. Uses select() + os.read()
-    to poll the PTY (same pattern as pager.py).
+    ``source`` is whatever spawn_line_buffered_decoder returned: a POSIX pty
+    master fd (line-buffered via the child's TTY) or, on Windows, the decoder's
+    stdout pipe. read_decoder_lines abstracts the platform difference.
 
     Outputs two types of messages to the queue:
     - type='aprs': Decoded APRS packets
@@ -1510,112 +1509,91 @@ def stream_aprs_output(master_fd: int, rtl_process: subprocess.Popen, decoder_pr
     try:
         app_module.aprs_queue.put({'type': 'status', 'status': 'started'})
 
-        # Read from PTY using select() for non-blocking reads.
-        # PTY forces the decoder to line-buffer, so output arrives immediately
-        # instead of waiting for a full 4-8KB pipe buffer to fill.
-        buffer = ""
-        while True:
-            try:
-                ready, _, _ = select.select([master_fd], [], [], 1.0)
-            except Exception:
-                break
+        # read_decoder_lines yields decoded, stripped, non-empty lines from the
+        # decoder regardless of platform: a pty master fd on POSIX
+        # (line-buffered via the child's TTY) or the decoder's stdout pipe on
+        # Windows (blocking readline).
+        for line in read_decoder_lines(source, decoder_process):
+            # Check for audio level line first (for signal meter)
+            audio_level = parse_audio_level(line)
+            if audio_level is not None:
+                if should_send_meter_update(audio_level):
+                    meter_msg = {
+                        'type': 'meter',
+                        'level': audio_level,
+                        'ts': datetime.utcnow().isoformat() + 'Z'
+                    }
+                    app_module.aprs_queue.put(meter_msg)
+                continue  # Audio level lines are not packets
 
-            if ready:
-                try:
-                    data = os.read(master_fd, 1024)
-                    if not data:
-                        break
-                    buffer += data.decode('utf-8', errors='replace')
-                except OSError:
-                    break
+            # Normalize decoder prefixes (multimon/direwolf) before parsing.
+            line = normalize_aprs_output_line(line)
 
-                while '\n' in buffer:
-                    line, buffer = buffer.split('\n', 1)
-                    line = line.strip()
-                    if not line:
-                        continue
+            # Skip non-packet lines (APRS format: CALL>PATH:DATA)
+            if '>' not in line or ':' not in line:
+                continue
 
-                    # Check for audio level line first (for signal meter)
-                    audio_level = parse_audio_level(line)
-                    if audio_level is not None:
-                        if should_send_meter_update(audio_level):
-                            meter_msg = {
-                                'type': 'meter',
-                                'level': audio_level,
-                                'ts': datetime.utcnow().isoformat() + 'Z'
-                            }
-                            app_module.aprs_queue.put(meter_msg)
-                        continue  # Audio level lines are not packets
+            packet = parse_aprs_packet(line)
+            if packet:
+                aprs_packet_count += 1
+                aprs_last_packet_time = time.time()
 
-                    # Normalize decoder prefixes (multimon/direwolf) before parsing.
-                    line = normalize_aprs_output_line(line)
+                # Track unique stations
+                callsign = packet.get('callsign')
+                if callsign and callsign not in aprs_stations:
+                    aprs_station_count += 1
 
-                    # Skip non-packet lines (APRS format: CALL>PATH:DATA)
-                    if '>' not in line or ':' not in line:
-                        continue
+                # Update station data, preserving last known coordinates when
+                # packets do not contain position fields.
+                if callsign:
+                    existing = aprs_stations.get(callsign, {})
+                    packet_lat = packet.get('lat')
+                    packet_lon = packet.get('lon')
+                    aprs_stations[callsign] = {
+                        'callsign': callsign,
+                        'lat': packet_lat if packet_lat is not None else existing.get('lat'),
+                        'lon': packet_lon if packet_lon is not None else existing.get('lon'),
+                        'symbol': packet.get('symbol') or existing.get('symbol'),
+                        'last_seen': packet.get('timestamp'),
+                        'packet_type': packet.get('packet_type'),
+                    }
+                    # Geofence check
+                    _aprs_lat = packet_lat
+                    _aprs_lon = packet_lon
+                    if _aprs_lat is not None and _aprs_lon is not None:
+                        try:
+                            from utils.geofence import get_geofence_manager
+                            for _gf_evt in get_geofence_manager().check_position(
+                                callsign, 'aprs_station', _aprs_lat, _aprs_lon,
+                                {'callsign': callsign}
+                            ):
+                                process_event('aprs', _gf_evt, 'geofence')
+                        except Exception:
+                            pass
+                    # Evict oldest stations when limit is exceeded
+                    if len(aprs_stations) > APRS_MAX_STATIONS:
+                        oldest = min(
+                            aprs_stations,
+                            key=lambda k: aprs_stations[k].get('last_seen', ''),
+                        )
+                        del aprs_stations[oldest]
 
-                    packet = parse_aprs_packet(line)
-                    if packet:
-                        aprs_packet_count += 1
-                        aprs_last_packet_time = time.time()
+                app_module.aprs_queue.put(packet)
 
-                        # Track unique stations
-                        callsign = packet.get('callsign')
-                        if callsign and callsign not in aprs_stations:
-                            aprs_station_count += 1
-
-                        # Update station data, preserving last known coordinates when
-                        # packets do not contain position fields.
-                        if callsign:
-                            existing = aprs_stations.get(callsign, {})
-                            packet_lat = packet.get('lat')
-                            packet_lon = packet.get('lon')
-                            aprs_stations[callsign] = {
-                                'callsign': callsign,
-                                'lat': packet_lat if packet_lat is not None else existing.get('lat'),
-                                'lon': packet_lon if packet_lon is not None else existing.get('lon'),
-                                'symbol': packet.get('symbol') or existing.get('symbol'),
-                                'last_seen': packet.get('timestamp'),
-                                'packet_type': packet.get('packet_type'),
-                            }
-                            # Geofence check
-                            _aprs_lat = packet_lat
-                            _aprs_lon = packet_lon
-                            if _aprs_lat is not None and _aprs_lon is not None:
-                                try:
-                                    from utils.geofence import get_geofence_manager
-                                    for _gf_evt in get_geofence_manager().check_position(
-                                        callsign, 'aprs_station', _aprs_lat, _aprs_lon,
-                                        {'callsign': callsign}
-                                    ):
-                                        process_event('aprs', _gf_evt, 'geofence')
-                                except Exception:
-                                    pass
-                            # Evict oldest stations when limit is exceeded
-                            if len(aprs_stations) > APRS_MAX_STATIONS:
-                                oldest = min(
-                                    aprs_stations,
-                                    key=lambda k: aprs_stations[k].get('last_seen', ''),
-                                )
-                                del aprs_stations[oldest]
-
-                        app_module.aprs_queue.put(packet)
-
-                        # Log if enabled
-                        if app_module.logging_enabled:
-                            try:
-                                with open(app_module.log_file_path, 'a') as f:
-                                    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                    f.write(f"{ts} | APRS | {json.dumps(packet)}\n")
-                            except Exception:
-                                pass
+                # Log if enabled
+                if app_module.logging_enabled:
+                    try:
+                        with open(app_module.log_file_path, 'a') as f:
+                            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            f.write(f"{ts} | APRS | {json.dumps(packet)}\n")
+                    except Exception:
+                        pass
 
     except Exception as e:
         logger.error(f"APRS stream error: {e}")
         app_module.aprs_queue.put({'type': 'error', 'message': str(e)})
     finally:
-        with contextlib.suppress(OSError):
-            os.close(master_fd)
+        close_decoder_source(source)
         app_module.aprs_queue.put({'type': 'status', 'status': 'stopped'})
         # Cleanup processes
         for proc in [rtl_process, decoder_process]:
@@ -1850,24 +1828,16 @@ def start_aprs() -> Response:
         rtl_stderr_thread = threading.Thread(target=monitor_rtl_stderr, daemon=True)
         rtl_stderr_thread.start()
 
-        # Create a pseudo-terminal for decoder output.  PTY forces the
-        # decoder to line-buffer its stdout, avoiding the 15-minute delay
-        # caused by full pipe buffering (~4-8KB) on small APRS packets.
-        master_fd, slave_fd = pty.openpty()
-
-        # Start decoder with stdin wired to rtl_fm's stdout.
-        # stdout/stderr go to the PTY slave so output is line-buffered.
-        decoder_process = subprocess.Popen(
+        # Spawn the decoder with stdin wired to rtl_fm's stdout. On POSIX this
+        # routes the decoder's stdout/stderr through a pty so it line-buffers
+        # (avoiding the multi-KB pipe-buffer delay on sparse APRS packets); on
+        # Windows it uses a combined pipe. `source` is what we read from.
+        decoder_process, source = spawn_line_buffered_decoder(
             decoder_cmd,
             stdin=rtl_process.stdout,
-            stdout=slave_fd,
-            stderr=slave_fd,
             close_fds=True,
-            start_new_session=True
+            start_new_session=True,
         )
-
-        # Close slave fd in parent — decoder owns it now.
-        os.close(slave_fd)
 
         # Close rtl_fm's stdout in parent so decoder owns it exclusively.
         # This ensures proper EOF propagation when rtl_fm terminates.
@@ -1891,8 +1861,7 @@ def start_aprs() -> Response:
             if stderr_output:
                 error_msg += f': {stderr_output[:500]}'
             logger.error(error_msg)
-            with contextlib.suppress(OSError):
-                os.close(master_fd)
+            close_decoder_source(source)
             with contextlib.suppress(Exception):
                 decoder_process.kill()
             if aprs_active_device is not None:
@@ -1902,21 +1871,20 @@ def start_aprs() -> Response:
             return api_error(error_msg, 500)
 
         if decoder_process.poll() is not None:
-            # Decoder exited early - capture any output from PTY
+            # Decoder exited early - capture any output it printed before dying.
             error_output = ''
             try:
-                ready, _, _ = select.select([master_fd], [], [], 0.5)
-                if ready:
-                    raw = os.read(master_fd, 500)
-                    error_output = raw.decode('utf-8', errors='replace')
+                for _err_line in read_decoder_lines(source, decoder_process):
+                    error_output += _err_line + '\n'
+                    if len(error_output) > 500:
+                        break
             except Exception:
                 pass
             error_msg = f'{decoder_name} failed to start'
             if error_output:
-                error_msg += f': {error_output}'
+                error_msg += f': {error_output.strip()}'
             logger.error(error_msg)
-            with contextlib.suppress(OSError):
-                os.close(master_fd)
+            close_decoder_source(source)
             with contextlib.suppress(Exception):
                 rtl_process.kill()
             if aprs_active_device is not None:
@@ -1928,12 +1896,12 @@ def start_aprs() -> Response:
         # Store references for status checks and cleanup
         app_module.aprs_process = decoder_process
         app_module.aprs_rtl_process = rtl_process
-        app_module.aprs_master_fd = master_fd
+        app_module.aprs_master_fd = source
 
         # Start background thread to read decoder output and push to queue
         thread = threading.Thread(
             target=stream_aprs_output,
-            args=(master_fd, rtl_process, decoder_process),
+            args=(source, rtl_process, decoder_process),
             daemon=True
         )
         thread.start()
@@ -1987,7 +1955,7 @@ def stop_aprs() -> Response:
             aprs_active_sdr_type = None
 
         # Capture refs to clear before releasing the lock
-        master_fd = getattr(app_module, 'aprs_master_fd', None)
+        decoder_source = getattr(app_module, 'aprs_master_fd', None)
         app_module.aprs_process = None
         if hasattr(app_module, 'aprs_rtl_process'):
             app_module.aprs_rtl_process = None
@@ -1997,10 +1965,10 @@ def stop_aprs() -> Response:
     # Each proc.wait() can block up to PROCESS_TERMINATE_TIMEOUT (2s),
     # which previously caused the frontend 2200ms fetch to abort.
     def _cleanup():
-        # Close PTY master fd first — this unblocks the stream thread
-        if master_fd is not None:
-            with contextlib.suppress(OSError):
-                os.close(master_fd)
+        # Close the decoder output source first — unblocks the stream thread
+        # (pty master fd on POSIX, stdout pipe on Windows).
+        if decoder_source is not None:
+            close_decoder_source(decoder_source)
         for proc in processes_to_stop:
             try:
                 proc.terminate()
