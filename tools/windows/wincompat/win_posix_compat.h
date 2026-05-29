@@ -89,6 +89,15 @@ static __attribute__((unused)) struct tm *_wincompat_gmtime_r(time_t t, struct t
 }
 #define gmtime_r(timep, result) _wincompat_gmtime_r((time_t)(*(timep)), (result))
 
+/* localtime_r(3) — same story as gmtime_r; mingw only has localtime_s. */
+static __attribute__((unused)) struct tm *_wincompat_localtime_r(time_t t, struct tm *result)
+{
+	if (localtime_s(result, &t) != 0)
+		return NULL;
+	return result;
+}
+#define localtime_r(timep, result) _wincompat_localtime_r((time_t)(*(timep)), (result))
+
 /* gmtime(3) / localtime(3) — dumpvdl2 passes &tv.tv_sec (Winsock 32-bit long)
  * to these, mismatching the const time_t* (64-bit) prototype (hard error under
  * GCC 14). Wrap as macros that widen the value to time_t and use the reentrant
