@@ -30,6 +30,7 @@ from utils.constants import (
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
 )
+from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.flight_correlator import get_flight_correlator
 from utils.logging import sensor_logger as logger
@@ -44,24 +45,22 @@ vdl2_bp = Blueprint('vdl2', __name__, url_prefix='/vdl2')
 
 @vdl2_bp.before_request
 def _gate_vdl2_on_windows():
-    """Gate VDL2 on Windows: there's no Windows build of dumpvdl2.
+    """Gate VDL2 on Windows only if no dumpvdl2 binary is available.
 
-    The route code itself is Windows-compatible (the pty path is macOS-only;
-    everything else uses portable subprocess.PIPE) — the only blocker is the
-    missing decoder binary. dumpvdl2 also depends on glib, so a Windows build
-    is a bigger lift than acarsdec. Once one is bundled in tools/windows/,
-    this gate can be relaxed to check for the binary.
+    A Windows dumpvdl2 (2.6.0, cross-built with MSYS2 against glib + libacars)
+    now ships in tools/windows/dumpvdl2/. The route's pty path is macOS-only;
+    the Windows/Linux path uses subprocess.PIPE. 503 only if the binary is
+    somehow missing.
     """
     from flask import jsonify, request
 
     from utils.platform import IS_WINDOWS, windows_not_supported_response
 
-    if IS_WINDOWS and request.method == 'POST':
+    if IS_WINDOWS and request.method == 'POST' and find_dumpvdl2() is None:
         body, status = windows_not_supported_response(
             "VDL2 aircraft datalink",
-            "dumpvdl2 has no official Windows build, so the VDL Mode 2 decoder "
-            "isn't bundled yet. Run INTERCEPT on Linux (or via Docker) for this "
-            "feature.",
+            "No dumpvdl2 binary found. The bundled Windows build should live in "
+            "tools/windows/dumpvdl2/ — reinstall intercept.exe if this persists.",
         )
         return jsonify(body), status
     return None
@@ -86,8 +85,8 @@ vdl2_active_sdr_type: str | None = None
 
 
 def find_dumpvdl2():
-    """Find dumpvdl2 binary."""
-    return shutil.which('dumpvdl2')
+    """Find dumpvdl2 binary (checks bundled tools/windows/dumpvdl2/ on Windows)."""
+    return get_tool_path('dumpvdl2')
 
 
 def stream_vdl2_output(process: subprocess.Popen, is_text_mode: bool = False) -> None:
