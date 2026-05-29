@@ -46,8 +46,13 @@ static __attribute__((unused)) char *strsep(char **stringp, const char *delim)
 	return start;
 }
 
-/* strndup(3) — POSIX/GNU; not declared by mingw <string.h> in this config. */
-static __attribute__((unused)) char *strndup(const char *s, size_t n)
+/* strndup(3) — mingw <string.h> declares it only in non-strict mode, so
+ * strict-ANSI builds (dumpvdl2's) get an implicit-declaration error while a
+ * default build sees the real declaration. A plain `static strndup` collides
+ * with that declaration (and broke even cmake's compiler test). Provide a
+ * privately-named impl and macro-rename — works whether or not mingw's
+ * declaration is visible, since <string.h> was already included above. */
+static __attribute__((unused)) char *_wincompat_strndup(const char *s, size_t n)
 {
 	size_t len = strnlen(s, n);
 	char *p = (char *)malloc(len + 1);
@@ -58,6 +63,7 @@ static __attribute__((unused)) char *strndup(const char *s, size_t n)
 	}
 	return p;
 }
+#define strndup _wincompat_strndup
 
 /* strsignal(3) — absent from mingw; a generic label is enough here. */
 static __attribute__((unused)) char *strsignal(int sig)
