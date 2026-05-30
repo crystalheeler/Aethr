@@ -258,10 +258,27 @@ def start_sensor() -> Response:
             thread.start()
 
             # Monitor stderr
-            # Filter noisy rtl_433 diagnostics that aren't useful to display
+            # Filter noisy rtl_433 diagnostics that aren't useful to display.
+            # These cover: (1) the startup banner / hint / version line that
+            # rtl_433 always prints, (2) transient init messages that settle
+            # in milliseconds (the PLL one fires a few times until the R820T
+            # tuner's PLL locks), (3) mid-run decoder chatter that's only
+            # interesting at log-level for the developer. We deliberately
+            # leave through real device-not-found / driver-blocked errors.
             _stderr_noise = (
+                # Mid-run decoder chatter
                 'bitbuffer_add_bit',
                 'row count limit',
+                # Startup banner / informational hints
+                'Use "-F log"',
+                'rtl_433 version',
+                'Found Rafael Micro',
+                'Found Elonics',
+                'Found Fitipower',
+                'Found FCI',
+                'Exact sample rate',
+                # Transient init: PLL relock noise, settles within a few ms
+                'PLL not locked',
             )
 
             def monitor_stderr():

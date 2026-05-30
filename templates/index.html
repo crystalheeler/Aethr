@@ -5533,9 +5533,13 @@
                     if (data.status === 'started') {
                         reserveDevice(parseInt(device), 'sensor');
                         setSensorRunning(true);
-                        startSensorStream();
 
-                        // Initialize sensor filter bar
+                        // Initialize sensor filter bar + clear output BEFORE
+                        // we open the SSE stream — otherwise rtl_433's startup
+                        // stderr lines that arrive in the first ~400 ms are
+                        // rendered into #output and then immediately wiped by
+                        // the `output.innerHTML = ...` reset below, producing
+                        // a confusing flash of "errors" the user can't read.
                         const filterContainer = document.getElementById('filterBarContainer');
                         const output = document.getElementById('output');
                         if (filterContainer) {
@@ -5548,8 +5552,11 @@
                         // Clear address history for fresh session
                         SignalCards.clearAddressHistory('sensor');
 
-                        // Clear existing output
+                        // Clear existing output (before stream so info-msg
+                        // divs from the SSE don't get wiped).
                         output.innerHTML = '<div class="placeholder signal-empty-state" style="display: none;"></div>';
+
+                        startSensorStream();
                     } else {
                         showInfo('Error: ' + (data.message || 'Failed to start sensor'));
                     }
