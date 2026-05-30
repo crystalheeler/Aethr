@@ -421,30 +421,35 @@ def start_acars() -> Response:
 
 @acars_bp.route('/stop', methods=['POST'])
 def stop_acars() -> Response:
-    """Stop ACARS decoder."""
+    """Stop ACARS decoder.
+
+    Idempotent (see stop_vdl2 for the same rationale): an acarsdec child can
+    die on its own; this stop returns success regardless and unconditionally
+    cleans up the SDR claim so a stale registry entry can't lock out the
+    next Start.
+    """
     global acars_active_device, acars_active_sdr_type
 
+    was_running = False
     with app_module.acars_lock:
-        if not app_module.acars_process:
-            return api_error('ACARS decoder not running', 400)
+        if app_module.acars_process:
+            was_running = True
+            try:
+                app_module.acars_process.terminate()
+                app_module.acars_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                app_module.acars_process.kill()
+            except Exception as e:
+                logger.error(f"Error stopping ACARS: {e}")
+            app_module.acars_process = None
 
-        try:
-            app_module.acars_process.terminate()
-            app_module.acars_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            app_module.acars_process.kill()
-        except Exception as e:
-            logger.error(f"Error stopping ACARS: {e}")
-
-        app_module.acars_process = None
-
-    # Release device from registry
+    # Always release — clears any stale claim from a self-terminated child.
     if acars_active_device is not None:
         app_module.release_sdr_device(acars_active_device, acars_active_sdr_type or 'rtlsdr')
         acars_active_device = None
         acars_active_sdr_type = None
 
-    return jsonify({'status': 'stopped'})
+    return jsonify({'status': 'stopped', 'was_running': was_running})
 
 
 @acars_bp.route('/stream')

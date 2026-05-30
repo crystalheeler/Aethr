@@ -1945,11 +1945,12 @@ def stop_aprs() -> Response:
         if app_module.aprs_process:
             processes_to_stop.append(app_module.aprs_process)
 
-        if not processes_to_stop:
-            return api_error('APRS decoder not running', 400)
+        was_running = bool(processes_to_stop)
 
         # Release SDR device immediately so status panel reflects the
-        # change without waiting for process termination.
+        # change without waiting for process termination. Run this even if
+        # we have no processes — it clears stale registry state left by a
+        # child that self-terminated (decoder crash, USB hiccup, etc.).
         if aprs_active_device is not None:
             app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
             aprs_active_device = None
@@ -1979,9 +1980,13 @@ def stop_aprs() -> Response:
             except Exception as e:
                 logger.error(f"Error stopping APRS process: {e}")
 
-    threading.Thread(target=_cleanup, daemon=True).start()
+    if processes_to_stop:
+        threading.Thread(target=_cleanup, daemon=True).start()
 
-    return jsonify({'status': 'stopped'})
+    # Idempotent: succeed regardless. A 400 here just causes a confusing
+    # error popup when the child died on its own and the route already
+    # cleaned up — same pattern as VDL2/ACARS.
+    return jsonify({'status': 'stopped', 'was_running': was_running})
 
 
 @aprs_bp.route('/stream')

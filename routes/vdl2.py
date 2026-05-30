@@ -385,30 +385,40 @@ def start_vdl2() -> Response:
 
 @vdl2_bp.route('/stop', methods=['POST'])
 def stop_vdl2() -> Response:
-    """Stop VDL2 decoder."""
+    """Stop VDL2 decoder.
+
+    Idempotent: returns success even if nothing was running. The child
+    dumpvdl2 process can die on its own (SDR claim conflict, decoder crash,
+    librtlsdr error, etc.), in which case stream_vdl2_output's finally
+    block has already cleared app_module.vdl2_process by the time the user
+    hits Stop. Returning a 400 in that case (the old behavior) just lights
+    up a confusing "VDL2 decoder not running" popup in the UI.
+
+    Unconditionally releases the SDR claim too, so any stale registry
+    state from a self-terminating child is cleared.
+    """
     global vdl2_active_device, vdl2_active_sdr_type
 
+    was_running = False
     with app_module.vdl2_lock:
-        if not app_module.vdl2_process:
-            return api_error('VDL2 decoder not running', 400)
+        if app_module.vdl2_process:
+            was_running = True
+            try:
+                app_module.vdl2_process.terminate()
+                app_module.vdl2_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                app_module.vdl2_process.kill()
+            except Exception as e:
+                logger.error(f"Error stopping VDL2: {e}")
+            app_module.vdl2_process = None
 
-        try:
-            app_module.vdl2_process.terminate()
-            app_module.vdl2_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            app_module.vdl2_process.kill()
-        except Exception as e:
-            logger.error(f"Error stopping VDL2: {e}")
-
-        app_module.vdl2_process = None
-
-    # Release device from registry
+    # Always release — clears any stale claim from a self-terminated child.
     if vdl2_active_device is not None:
         app_module.release_sdr_device(vdl2_active_device, vdl2_active_sdr_type or 'rtlsdr')
         vdl2_active_device = None
         vdl2_active_sdr_type = None
 
-    return jsonify({'status': 'stopped'})
+    return jsonify({'status': 'stopped', 'was_running': was_running})
 
 
 @vdl2_bp.route('/stream')
