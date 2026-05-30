@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project rules
+
+These two rules apply to ALL changes in this repo and take precedence over default behavior:
+
+1. **Dead code must be stripped when its trigger goes away.** If we install a library, bundle a binary, write a code path, or add a workaround that we later replace or stop using, the unused parts get removed *in the same change* that removes the dependency. Comments and CHANGELOG entries that explain the history can stay — they're documentation, not dead code. If a removed thing has parts still in use elsewhere, keep those parts and verify they're still correctly wired into their new context. Do this proactively, without being asked.
+
+2. **Never publish a release without explicit confirmation.** Do not run `git tag v*` or `git push origin v*` or `gh release create`/`gh release edit` against an upcoming-version tag without the user having said, in that turn or one of the most recent turns, an explicit "ready to publish" / "go ahead and tag" / "ship it" or equivalent. Pushing to `main` is fine; cutting the actual release tag is not. The commits can be ready and pushed for ages; the tag is the gate.
+
 ## Project Overview
 
 INTERCEPT is a web-based Signal Intelligence (SIGINT) platform providing a unified Flask interface for software-defined radio (SDR) tools. It supports pager decoding, 433MHz sensors, ADS-B aircraft tracking, ACARS messaging, WiFi/Bluetooth scanning, satellite tracking, ISS SSTV decoding, AIS vessel tracking, weather satellite imagery (NOAA APT & Meteor LRPT), and Meshtastic mesh networking.
