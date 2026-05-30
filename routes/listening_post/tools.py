@@ -20,10 +20,20 @@ from . import (
 @receiver_bp.route('/tools')
 def check_tools() -> Response:
     """Check for required tools."""
+    import sys
+
     rtl_fm = find_rtl_fm()
     rtl_power = find_rtl_power()
     rx_fm = find_rx_fm()
     ffmpeg = find_ffmpeg()
+
+    # Audio pipeline works without ffmpeg on Windows (and on POSIX when ffmpeg
+    # is absent) via the native rtl_fm-PCM-plus-WAV-header path in
+    # listening_post/__init__._start_audio_stream. So "ffmpeg-equivalent
+    # available" is true on Windows regardless, and on POSIX iff ffmpeg is on
+    # PATH. Reporting it this way keeps the airband-listen UI from showing a
+    # bogus "missing ffmpeg" warning when audio actually works fine.
+    audio_encoder_available = ffmpeg is not None or sys.platform == 'win32'
 
     # Determine which SDR types are supported
     supported_sdr_types = []
@@ -37,8 +47,8 @@ def check_tools() -> Response:
         'rtl_fm': rtl_fm is not None,
         'rtl_power': rtl_power is not None,
         'rx_fm': rx_fm is not None,
-        'ffmpeg': ffmpeg is not None,
-        'available': (rtl_fm is not None or rx_fm is not None) and ffmpeg is not None,
+        'ffmpeg': audio_encoder_available,
+        'available': (rtl_fm is not None or rx_fm is not None) and audio_encoder_available,
         'supported_sdr_types': supported_sdr_types
     })
 

@@ -562,13 +562,20 @@ def _record_session_stop(*, stop_source: str | None, stopped_by: str | None) -> 
 
 
 def find_dump1090():
-    """Find dump1090 binary, checking PATH and common locations."""
-    # First try PATH
-    for name in ["dump1090", "dump1090-mutability", "dump1090-fa"]:
-        path = shutil.which(name)
+    """Find dump1090 binary.
+
+    Checks (in order): the INTERCEPT_<NAME>_PATH env override, the bundled
+    tools/windows/ directory on Windows, system PATH, and common Linux/macOS
+    install locations. We don't yet bundle a Windows dump1090 — that's a
+    follow-up — so on Windows this will typically return None until the user
+    installs one or we bundle a from-source cross-build.
+    """
+    from utils.dependencies import get_tool_path
+    for name in ("dump1090", "dump1090-mutability", "dump1090-fa"):
+        path = get_tool_path(name)
         if path:
             return path
-    # Check common installation paths directly
+    # Final fallback: hard-coded Linux/macOS install locations not on PATH.
     for path in DUMP1090_PATHS:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
@@ -1048,7 +1055,22 @@ def start_adsb():
     if sdr_type == SDRType.RTL_SDR:
         dump1090_path = find_dump1090()
         if not dump1090_path:
-            return api_error("dump1090 not found. Install dump1090/dump1090-fa or ensure it is in /usr/local/bin/")
+            import sys
+            if sys.platform == 'win32':
+                msg = (
+                    "ADS-B isn't available in this Windows build yet: there's "
+                    "no bundled dump1090.exe (MalcolmRobb/dump1090 doesn't ship "
+                    "releases, so it would need a from-source cross-build like "
+                    "acarsdec/dumpvdl2). Tracked for a follow-up release. Use "
+                    "Linux/Docker for ADS-B in the meantime."
+                )
+            else:
+                msg = (
+                    "dump1090 not found. Install dump1090 / dump1090-fa / "
+                    "dump1090-mutability via your package manager, or place "
+                    "the binary somewhere on PATH (or /usr/local/bin/)."
+                )
+            return api_error(msg)
     else:
         # For LimeSDR/HackRF, check for readsb (dump1090 with SoapySDR support)
         dump1090_path = shutil.which("readsb") or find_dump1090()
