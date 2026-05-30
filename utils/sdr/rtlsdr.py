@@ -104,31 +104,6 @@ def disable_bias_t_via_rtl_biast(device_index: int = 0) -> bool:
         return False
 
 
-def _detect_dump1090_variant(dump1090_path: str) -> str:
-    """Detect the dump1090 CLI variant ('classic' or 'gvanem').
-
-    The antirez / MalcolmRobb / FlightAware family — the "classic" Linux flavour
-    INTERCEPT was originally written for — takes ``--device-index``,
-    ``--quiet`` and ``--gain N`` directly as CLI flags. The gvanem/Dump1090
-    Windows fork (what we bundle on Windows) takes ``--device`` (no `-index`),
-    has no ``--quiet`` (quiet is its default), and only reads gain via a
-    ``dump1090.cfg`` config file. The two are otherwise wire-compatible — both
-    speak the SBS BaseStation protocol on port 30003 the ADS-B route consumes.
-
-    Cached because INTERCEPT may call this several times across spawn paths.
-    """
-    try:
-        result = subprocess.run(
-            [dump1090_path, '--help'],
-            capture_output=True, text=True, timeout=5,
-        )
-        help_text = (result.stdout or '') + (result.stderr or '')
-    except Exception as e:
-        logger.warning(f"Could not detect dump1090 variant for {dump1090_path}: {e}")
-        return 'classic'
-    return 'classic' if '--device-index' in help_text else 'gvanem'
-
-
 def _get_dump1090_bias_t_flag(dump1090_path: str) -> str | None:
     """Detect the correct bias-t flag for the installed dump1090 variant.
 
@@ -265,34 +240,15 @@ class RTLSDRCommandBuilder(CommandBuilder):
             )
 
         dump1090_path = get_tool_path('dump1090') or 'dump1090'
-        variant = _detect_dump1090_variant(dump1090_path)
+        cmd = [
+            dump1090_path,
+            '--net',
+            '--device-index', str(device.index),
+            '--quiet',
+        ]
 
-        if variant == 'gvanem':
-            # gvanem/Dump1090 (the Windows fork we bundle): --device instead of
-            # --device-index, no --quiet (default), no --gain CLI flag.
-            cmd = [
-                dump1090_path,
-                '--net',
-                '--device', str(device.index),
-            ]
-            if gain is not None:
-                # gvanem only honours gain via dump1090.cfg; CLI gain isn't a
-                # thing for this fork. Log so the user knows their slider value
-                # isn't being applied, and fall back to its default AGC.
-                logger.warning(
-                    f"dump1090 (gvanem fork) at {dump1090_path} doesn't accept "
-                    "--gain on the command line; falling back to AGC. "
-                    "(User-set gain via dump1090.cfg is a future enhancement.)"
-                )
-        else:
-            cmd = [
-                dump1090_path,
-                '--net',
-                '--device-index', str(device.index),
-                '--quiet',
-            ]
-            if gain is not None:
-                cmd.extend(['--gain', str(int(gain))])
+        if gain is not None:
+            cmd.extend(['--gain', str(int(gain))])
 
         if bias_t:
             bias_t_flag = _get_dump1090_bias_t_flag(dump1090_path)
