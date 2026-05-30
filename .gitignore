@@ -72,3 +72,6 @@ docs/superpowers/
 
 # Git worktrees
 .worktrees/
+
+# Local release-notes drafts (applied via 'gh release edit', not version-controlled)
+.release-notes-v*.md
