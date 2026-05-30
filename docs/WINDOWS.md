@@ -72,7 +72,7 @@ Paste the full path into the Run dialog (Win+R) to open the folder.
 |---|---|---|
 | **Pager (POCSAG/FLEX)** | ✅ Works | bundled `multimon-ng.exe` (cross-built from source) |
 | **433 MHz sensors** | ✅ Works | bundled `rtl_433.exe` |
-| **ADS-B aircraft** | ✅ Works | bundled `dump1090.exe` (gvanem Windows fork; user-set gain falls back to AGC) |
+| **ADS-B aircraft** | ✅ Works | bundled `dump1090.exe` (MalcolmRobb win32 build, classic CLI, full gain support) |
 | **AIS vessels** | ✅ Works | bundled `AIS-catcher.exe` |
 | **ACARS** | ✅ Works | bundled `acarsdec.exe` (cross-built from source) |
 | **VDL2** | ✅ Works | bundled `dumpvdl2.exe` (cross-built from source) |

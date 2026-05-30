@@ -15,10 +15,18 @@ import sys
 #     aa, bb, cc, …, zz     (doubled letter — 26 more)
 #     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
 # Each new upstream version resets the suffix back to "-a".
-VERSION = "2.27.0-c"
+VERSION = "2.27.0-d"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-d",
+        "date": "May 2026",
+        "highlights": [
+            "Fix: ADS-B on Windows actually works now — replaced gvanem dump1090 (silently refused to start without a config file, home-position wizard, and 19 MB downloaded aircraft database) with the smaller MalcolmRobb/dump1090 win32 binary release (classic antirez CLI; ships with its own matching 32-bit DLLs in tools/windows/dump1090/). User-set gain is honored (gvanem only read it from .cfg).",
+            "Fix: tighten the dump1090 stderr 'failed to open' pattern that previously misidentified a config-file warning as a missing-SDR error",
+        ],
+    },
     {
         "version": "2.27.0-c",
         "date": "May 2026",

@@ -1168,7 +1168,13 @@ def start_adsb():
             elif (
                 "no supported devices" in stderr_lower
                 or "no rtl-sdr" in stderr_lower
-                or "failed to open" in stderr_lower
+                # Specific device-open failures only. Earlier we used the
+                # bare substring "failed to open", which falsely caught
+                # gvanem dump1090's harmless "Failed to open dump1090.cfg"
+                # config-file warning and labelled it a missing-SDR error.
+                or "failed to open device" in stderr_lower
+                or "failed to open rtl" in stderr_lower
+                or "rtlsdr_open" in stderr_lower
             ):
                 error_msg = f"{sdr_label} device not found."
                 suggestion = "Ensure the device is connected. Try removing and reinserting the SDR."
