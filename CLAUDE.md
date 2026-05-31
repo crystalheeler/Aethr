@@ -10,6 +10,8 @@ These two rules apply to ALL changes in this repo and take precedence over defau
 
 2. **Never publish a release without explicit confirmation.** Do not run `git tag v*` or `git push origin v*` or `gh release create`/`gh release edit` against an upcoming-version tag without the user having said, in that turn or one of the most recent turns, an explicit "ready to publish" / "go ahead and tag" / "ship it" or equivalent. Pushing to `main` is fine; cutting the actual release tag is not. The commits can be ready and pushed for ages; the tag is the gate.
 
+3. **Rebuild `dist/intercept.exe` after committing fixes without asking.** When you've committed a code change the user might want to test locally, kick off `venv/Scripts/pyinstaller.exe --clean --noconfirm intercept.spec` (background) immediately. Don't ask for confirmation each time. (This rule is about local rebuilds only — rule 2 still gates release tags.)
+
 ## Project Overview
 
 INTERCEPT is a web-based Signal Intelligence (SIGINT) platform providing a unified Flask interface for software-defined radio (SDR) tools. It supports pager decoding, 433MHz sensors, ADS-B aircraft tracking, ACARS messaging, WiFi/Bluetooth scanning, satellite tracking, ISS SSTV decoding, AIS vessel tracking, weather satellite imagery (NOAA APT & Meteor LRPT), and Meshtastic mesh networking.
