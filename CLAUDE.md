@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project rules
 
-These two rules apply to ALL changes in this repo and take precedence over default behavior:
+These rules apply to ALL changes in this repo and take precedence over default behavior:
 
 1. **Dead code must be stripped when its trigger goes away.** If we install a library, bundle a binary, write a code path, or add a workaround that we later replace or stop using, the unused parts get removed *in the same change* that removes the dependency. Comments and CHANGELOG entries that explain the history can stay — they're documentation, not dead code. If a removed thing has parts still in use elsewhere, keep those parts and verify they're still correctly wired into their new context. Do this proactively, without being asked.
 
 2. **Never publish a release without explicit confirmation.** Do not run `git tag v*` or `git push origin v*` or `gh release create`/`gh release edit` against an upcoming-version tag without the user having said, in that turn or one of the most recent turns, an explicit "ready to publish" / "go ahead and tag" / "ship it" or equivalent. Pushing to `main` is fine; cutting the actual release tag is not. The commits can be ready and pushed for ages; the tag is the gate.
 
 3. **Rebuild `dist/intercept.exe` after committing fixes without asking.** When you've committed a code change the user might want to test locally, kick off `venv/Scripts/pyinstaller.exe --clean --noconfirm intercept.spec` (background) immediately. Don't ask for confirmation each time. (This rule is about local rebuilds only — rule 2 still gates release tags.)
+
+4. **Cross-platform parity for shared code.** If a fix lives in code that runs on every platform (routes, utils, templates, JS, CSS), it applies to Linux/macOS automatically — don't wrap it in a Windows-only guard unless the fix is genuinely platform-specific (e.g., a bundled binary path, a Windows API call, a path separator issue). When the change *is* platform-specific (e.g., bundling a Windows binary to unblock a mode), only the binary and its discovery path are Windows-scoped — the route/UI wiring that uses it stays shared so Linux keeps working through its own native install. Before declaring a change "Windows-only," ask whether the bug it fixes could also exist on Linux/macOS; if yes, fix it in the shared path. Conversely, when fixing a bug a user reported on Linux, check whether the same shared code path would misbehave on Windows and fix both in the same change.
 
 ## Project Overview
 
