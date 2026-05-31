@@ -38,6 +38,186 @@
         window.INTERCEPT_DEFAULT_LAT = {{ default_latitude | tojson }};
         window.INTERCEPT_DEFAULT_LON = {{ default_longitude | tojson }};
     </script>
+    <!--
+        Server-down detection and UI lockout.
+
+        Catches the case where the INTERCEPT backend has stopped responding
+        (e.g. the user quit the tray icon, or the exe crashed) while a browser
+        tab is still open. Two detection paths:
+          1. Wrap window.fetch — any same-origin fetch that fails with
+             TypeError/NetworkError (on localhost, this is definitive: the
+             process is gone) immediately flips to "down" state, AND the
+             wrapped promise never resolves, so callers' .catch handlers
+             don't fire the usual "Failed to do X: NetworkError" alert
+             popup that would otherwise flash on top of the overlay.
+          2. Passive heartbeat against /health every 5s — needed because a
+             quiet tab (no user interaction → no fetches) wouldn't notice.
+             Requires 2 consecutive failures to flip, so a single slow tick
+             doesn't false-positive.
+
+        On recovery (heartbeat starts succeeding again), auto-reload — that's
+        the cleanest way to restore SSE streams, mode state, and any other
+        in-page state that depends on a live backend.
+
+        The overlay z-index intentionally tops everything so it can't be
+        hidden behind modals or the welcome screen.
+    -->
+    <script>
+        (function() {
+            'use strict';
+
+            var state = {
+                down: false,
+                consecutiveHeartbeatFailures: 0,
+                HEARTBEAT_FAIL_THRESHOLD: 2,
+                HEARTBEAT_MS: 5000,
+                FETCH_TIMEOUT_MS: 3000,
+                overlay: null,
+                statusEl: null,
+                reconnectBtn: null
+            };
+
+            var _originalFetch = window.fetch.bind(window);
+
+            function buildOverlay() {
+                if (state.overlay) return;
+                var ov = document.createElement('div');
+                ov.id = 'server-down-overlay';
+                ov.setAttribute('role', 'alertdialog');
+                ov.setAttribute('aria-modal', 'true');
+                ov.style.cssText = [
+                    'position:fixed', 'inset:0',
+                    'background:rgba(0,0,0,0.85)',
+                    '-webkit-backdrop-filter:blur(4px)',
+                    'backdrop-filter:blur(4px)',
+                    'z-index:2147483647',
+                    'display:flex', 'align-items:center', 'justify-content:center',
+                    "font-family:'Inter',system-ui,sans-serif",
+                    'color:#e8e8e8'
+                ].join(';');
+                ov.innerHTML = [
+                    '<div style="max-width:480px;padding:32px;background:#1a1a1a;border:1px solid #444;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.6);text-align:center">',
+                        '<div style="font-size:48px;margin-bottom:16px;line-height:1">&#9888;</div>',
+                        '<h2 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#ff6b6b">INTERCEPT server stopped</h2>',
+                        '<p style="margin:0 0 8px 0;font-size:15px;line-height:1.5;color:#bbb">The INTERCEPT backend is no longer responding. It was probably quit (system tray &rarr; Quit) or crashed.</p>',
+                        '<p style="margin:0 0 4px 0;font-size:13px;color:#888;line-height:1.5">Restart <code style="color:#ccc;background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:\'JetBrains Mono\',monospace">intercept.exe</code>, then click Reconnect.</p>',
+                        '<p id="server-down-status" style="margin:16px 0 24px 0;font-size:12px;color:#666;font-family:\'JetBrains Mono\',monospace;min-height:16px"></p>',
+                        '<div style="display:flex;gap:12px;justify-content:center">',
+                            '<button id="server-down-reconnect" type="button" style="padding:10px 22px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer">Reconnect</button>',
+                            '<button id="server-down-refresh" type="button" style="padding:10px 22px;background:transparent;color:#bbb;border:1px solid #555;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer">Refresh page</button>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+                document.body.appendChild(ov);
+                state.overlay = ov;
+                state.statusEl = ov.querySelector('#server-down-status');
+                state.reconnectBtn = ov.querySelector('#server-down-reconnect');
+
+                state.reconnectBtn.addEventListener('click', function() {
+                    state.statusEl.textContent = 'Reconnecting...';
+                    state.reconnectBtn.disabled = true;
+                    state.reconnectBtn.style.opacity = '0.5';
+                    runHeartbeat(true);
+                });
+                ov.querySelector('#server-down-refresh').addEventListener('click', function() {
+                    window.location.reload();
+                });
+            }
+
+            function showOverlay() {
+                if (!document.body) {
+                    document.addEventListener('DOMContentLoaded', showOverlay, { once: true });
+                    return;
+                }
+                buildOverlay();
+                state.overlay.style.display = 'flex';
+            }
+
+            function setDown(reason) {
+                if (state.down) return;
+                state.down = true;
+                try { console.warn('[server-monitor] backend marked down:', reason); } catch (_) {}
+                showOverlay();
+            }
+
+            function setUp() {
+                if (!state.down) return;
+                state.down = false;
+                state.consecutiveHeartbeatFailures = 0;
+                try { console.info('[server-monitor] backend recovered - reloading'); } catch (_) {}
+                if (state.statusEl) {
+                    state.statusEl.textContent = 'Reconnected - reloading...';
+                    state.statusEl.style.color = '#4ade80';
+                }
+                setTimeout(function() { window.location.reload(); }, 400);
+            }
+
+            function runHeartbeat(forced) {
+                var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                var timer = controller ? setTimeout(function() {
+                    try { controller.abort(); } catch (_) {}
+                }, state.FETCH_TIMEOUT_MS) : null;
+                var init = { cache: 'no-store' };
+                if (controller) init.signal = controller.signal;
+
+                _originalFetch('/health', init).then(function(resp) {
+                    if (timer) clearTimeout(timer);
+                    // Any HTTP response (even a 5xx) means the process is alive
+                    state.consecutiveHeartbeatFailures = 0;
+                    if (state.down) setUp();
+                }).catch(function(err) {
+                    if (timer) clearTimeout(timer);
+                    state.consecutiveHeartbeatFailures++;
+                    if (state.consecutiveHeartbeatFailures >= state.HEARTBEAT_FAIL_THRESHOLD) {
+                        setDown('heartbeat: ' + ((err && err.message) || err));
+                    }
+                    if (forced) {
+                        if (state.statusEl) state.statusEl.textContent = 'Still unreachable...';
+                        if (state.reconnectBtn) {
+                            state.reconnectBtn.disabled = false;
+                            state.reconnectBtn.style.opacity = '1';
+                        }
+                    }
+                });
+            }
+
+            // Wrap fetch. Same-origin TypeErrors on localhost are definitive
+            // "server is gone" signals — flip down immediately on the first
+            // one (no threshold needed, there's no real network in between).
+            window.fetch = function(input, init) {
+                var url = (typeof input === 'string') ? input : (input && input.url) || '';
+                var sameOrigin = !url || url.charAt(0) === '/' || (url.indexOf(window.location.origin) === 0);
+                if (!sameOrigin) {
+                    return _originalFetch(input, init);
+                }
+                return _originalFetch(input, init).then(function(resp) {
+                    // Any HTTP response means server alive (including 4xx/5xx)
+                    state.consecutiveHeartbeatFailures = 0;
+                    if (state.down) setUp();
+                    return resp;
+                }).catch(function(err) {
+                    // AbortError = intentional cancel (user nav, our timeout) — pass through
+                    if (err && err.name === 'AbortError') throw err;
+                    setDown('fetch: ' + ((err && err.message) || err));
+                    // Never resolve. This prevents callers' .catch handlers
+                    // from firing alert()/toast popups for in-flight fetches
+                    // that all failed because the server died.
+                    return new Promise(function() {});
+                });
+            };
+
+            // Start the passive heartbeat once the body exists (so we can
+            // attach the overlay if we need to).
+            function start() {
+                setInterval(function() { runHeartbeat(false); }, state.HEARTBEAT_MS);
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', start, { once: true });
+            } else {
+                start();
+            }
+        })();
+    </script>
     <!-- Fonts - Conditional CDN/Local loading -->
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
