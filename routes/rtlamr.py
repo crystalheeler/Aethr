@@ -13,6 +13,7 @@ from datetime import datetime
 from flask import Blueprint, Response, jsonify, request
 
 import app as app_module
+from utils.dependencies import get_tool_path
 from utils.event_pipeline import process_event
 from utils.logging import sensor_logger as logger
 from utils.process import register_process, unregister_process
@@ -134,6 +135,30 @@ def start_rtlamr() -> Response:
         msgtype = data.get('msgtype', 'scm')
         output_format = data.get('format', 'json')
 
+        # Resolve binary paths up front so we can surface a clean error
+        # (instead of a bare FileNotFoundError) when a tool is missing on
+        # this platform. On Windows the bundled tools/windows/ binaries
+        # are preferred over PATH; on Linux/macOS PATH lookup wins.
+        rtl_tcp_path = get_tool_path('rtl_tcp')
+        if rtl_tcp_path is None:
+            if rtlamr_active_device is not None:
+                app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
+                rtlamr_active_device = None
+            return api_error(
+                'rtl_tcp not found. On Windows it should ship with intercept.exe; '
+                'on Linux install librtlsdr-dev / rtl-sdr.'
+            )
+
+        rtlamr_path = get_tool_path('rtlamr')
+        if rtlamr_path is None:
+            if rtlamr_active_device is not None:
+                app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
+                rtlamr_active_device = None
+            return api_error(
+                'rtlamr not found. On Windows it should ship with intercept.exe; '
+                'on Linux install from https://github.com/bemasher/rtlamr'
+            )
+
         # Start rtl_tcp first
         rtl_tcp_just_started = False
         rtl_tcp_cmd_str = ''
@@ -141,7 +166,7 @@ def start_rtlamr() -> Response:
             if not rtl_tcp_process:
                 logger.info("Starting rtl_tcp server...")
                 try:
-                    rtl_tcp_cmd = ['rtl_tcp', '-a', '0.0.0.0']
+                    rtl_tcp_cmd = [rtl_tcp_path, '-a', '0.0.0.0']
 
                     # Add device index if not 0
                     if device and device != '0':
@@ -177,9 +202,9 @@ def start_rtlamr() -> Response:
             logger.info(f"rtl_tcp started: {rtl_tcp_cmd_str}")
             app_module.rtlamr_queue.put({'type': 'info', 'text': f'rtl_tcp: {rtl_tcp_cmd_str}'})
 
-        # Build rtlamr command
+        # Build rtlamr command (path resolved up front via get_tool_path)
         cmd = [
-            'rtlamr',
+            rtlamr_path,
             '-server=127.0.0.1:1234',
             f'-msgtype={msgtype}',
             f'-format={output_format}',
@@ -227,21 +252,16 @@ def start_rtlamr() -> Response:
             stderr_thread.daemon = True
             stderr_thread.start()
 
-            app_module.rtlamr_queue.put({'type': 'info', 'text': f'Command: {full_cmd}'})
+            # NB: not pushing "Command: ..." to the UI here — same rationale
+            # as routes/sensor.py (developer context, reads like a notification
+            # but conveys nothing actionable to an end user). It's already
+            # logged above and returned in the JSON response for debugging.
+            logger.debug(f"Started rtlamr: {full_cmd}")
 
             return jsonify({'status': 'started', 'command': full_cmd})
 
-        except FileNotFoundError:
-            # If rtlamr fails, clean up rtl_tcp and release device
-            with rtl_tcp_lock:
-                if rtl_tcp_process:
-                    rtl_tcp_process.terminate()
-                    rtl_tcp_process.wait(timeout=2)
-                    rtl_tcp_process = None
-            if rtlamr_active_device is not None:
-                app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
-                rtlamr_active_device = None
-            return api_error('rtlamr not found. Install from https://github.com/bemasher/rtlamr')
+        # FileNotFoundError can no longer happen here — rtlamr_path is
+        # validated via get_tool_path() above before we get this far.
         except Exception as e:
             # If rtlamr fails, clean up rtl_tcp and release device
             with rtl_tcp_lock:

@@ -15,10 +15,18 @@ import sys
 #     aa, bb, cc, …, zz     (doubled letter — 26 more)
 #     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
 # Each new upstream version resets the suffix back to "-a".
-VERSION = "2.27.0-d"
+VERSION = "2.27.0-e"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-e",
+        "date": "June 2026",
+        "highlights": [
+            "Feat: Meters (utility meter reading) now works on Windows — bundled the official `rtlamr.exe` from bemasher/rtlamr v0.9.5 release, alongside the already-bundled `rtl_tcp.exe`. The route's bare-name subprocess calls now go through get_tool_path() so the bundled binary is preferred on Windows and the system one is still used on Linux/macOS.",
+            "Fix: drop the developer-only 'Command: rtlamr ...' info card that appeared every time Meters mode started (same rationale as the sensor-mode cleanup in -d).",
+        ],
+    },
     {
         "version": "2.27.0-d",
         "date": "May 2026",
