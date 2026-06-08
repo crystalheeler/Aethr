@@ -5858,7 +5858,10 @@
             eventSource = new EventSource('/stream_sensor');
 
             eventSource.onopen = function () {
-                showInfo('Sensor stream connected...');
+                // No user-facing toast here — the SSE channel opening is
+                // an implementation detail; users already see the Start
+                // button transition + the decoder's own "started" status.
+                console.debug('Sensor stream connected');
             };
 
             eventSource.onmessage = function (e) {
@@ -5871,8 +5874,12 @@
                     if (data.text === 'stopped') {
                         setSensorRunning(false);
                     }
-                } else if (data.type === 'info' || data.type === 'raw') {
+                } else if (data.type === 'info') {
                     showInfo(data.text);
+                } else if (data.type === 'raw') {
+                    // 'raw' = decoder stdout that failed JSON parse (banner
+                    // chatter, partial output, etc.) — debug only, not a toast.
+                    console.debug('[sensor:raw]', data.text);
                 }
             };
 
@@ -6132,7 +6139,7 @@
             eventSource = new EventSource(streamUrl);
 
             eventSource.onopen = function () {
-                showInfo('RTLAMR stream connected...');
+                console.debug('RTLAMR stream connected');
             };
 
             eventSource.onmessage = function (e) {
@@ -6149,8 +6156,11 @@
                             if (payload.text === 'stopped') {
                                 setRtlamrRunning(false);
                             }
-                        } else if (payload.type === 'info' || payload.type === 'raw') {
+                        } else if (payload.type === 'info') {
                             showInfo(`[${data.agent_name}] ${payload.text}`);
+                        } else if (payload.type === 'raw') {
+                            // Non-JSON decoder stdout — debug only.
+                            console.debug(`[rtlamr:raw][${data.agent_name}]`, payload.text);
                         }
                     }
                 } else {
@@ -6161,8 +6171,10 @@
                         if (data.text === 'stopped') {
                             setRtlamrRunning(false);
                         }
-                    } else if (data.type === 'info' || data.type === 'raw') {
+                    } else if (data.type === 'info') {
                         showInfo(data.text);
+                    } else if (data.type === 'raw') {
+                        console.debug('[rtlamr:raw]', data.text);
                     }
                 }
             };
@@ -7275,7 +7287,7 @@
             eventSource = new EventSource(streamUrl);
 
             eventSource.onopen = function () {
-                showInfo('Stream connected...');
+                console.debug('Pager stream connected');
             };
 
             eventSource.onmessage = function (e) {
@@ -7317,7 +7329,9 @@
                     } else if (data.type === 'info') {
                         showInfo(data.text);
                     } else if (data.type === 'raw') {
-                        showInfo(data.text);
+                        // Non-JSON decoder stdout (multimon-ng banner,
+                        // partial output) — debug only, not a toast.
+                        console.debug('[pager:raw]', data.text);
                     } else if (data.type === 'scope') {
                         applyPagerScopeData(data);
                     }
@@ -9152,8 +9166,11 @@
                 } else if (data.type === 'client') {
                     pendingWifiClients.push(data);
                     scheduleWifiUIUpdate();
-                } else if (data.type === 'info' || data.type === 'raw') {
+                } else if (data.type === 'info') {
                     showInfo(data.text);
+                } else if (data.type === 'raw') {
+                    // Non-JSON scanner stdout fragment — debug only.
+                    console.debug('[wifi:raw]', data.text);
                 } else if (data.type === 'error') {
                     showError(data.text);
                 } else if (data.type === 'status') {
