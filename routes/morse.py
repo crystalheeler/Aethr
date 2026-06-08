@@ -516,7 +516,10 @@ def start_morse() -> Response:
                     len(direct_sampling_attempts),
                     full_cmd,
                 )
-                _queue_morse_event({'type': 'info', 'text': f'[cmd] {full_cmd}'})
+                # NB: not pushing "[cmd] ..." to the UI — same rationale as
+                # the sensor/rtlamr/pager cleanup: developer context, reads
+                # like a notification but conveys nothing actionable. The
+                # full command was just logger.info'd above for debugging.
 
                 rtl_process = subprocess.Popen(
                     rtl_cmd,

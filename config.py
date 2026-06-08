@@ -27,6 +27,7 @@ CHANGELOG = [
             "Fix: Meters Start no longer races rtl_tcp. The route used to wait a fixed 3s after spawning rtl_tcp and then launch rtlamr; if the Windows Firewall prompt was holding rtl_tcp's bind back, rtlamr's single connect attempt would fail with 'connectex: No connection could be made' and the mode would die. Replaced with a 30s TCP-port poll against 127.0.0.1:1234 so we only spawn rtlamr once rtl_tcp is actually listening (and surface a clean error if it never does).",
             "Fix: Meters stderr noise — rtlamr writes structured slog text to stderr (status, debug, occasional ERROR-labeled chatter like 'not keeping up with rtl_tcp'). The old route surfaced every line as a blue info toast, burying real errors in noise. Lines are now classified by level= and known-noise messages are dropped; genuine errors come through as red toasts with just the relevant msg/error fields instead of a multi-screen Go stack trace.",
             "Fix: drop the developer-only 'Command: rtlamr ...' and 'rtl_tcp: ...' info cards that appeared every time Meters mode started (same rationale as the sensor-mode cleanup in -d).",
+            "Fix: same dev-debug toast cleanup in Pager (POCSAG/FLEX) and Morse modes — both used to push a raw 'Command: rtl_fm ...' / '[cmd] rtl_sdr ...' info card to the UI on every Start. Now logged to debug only.",
         ],
     },
     {

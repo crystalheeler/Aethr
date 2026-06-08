@@ -449,7 +449,12 @@ def start_decoding() -> Response:
             thread.daemon = True
             thread.start()
 
-            app_module.output_queue.put({'type': 'info', 'text': f'Command: {full_cmd}'})
+            # NB: not pushing "Command: ..." to the UI here — same rationale
+            # as routes/sensor.py and routes/rtlamr.py. Developer context,
+            # surfaces as a persistent info-style toast that reads like a
+            # notification but conveys nothing actionable to an end user.
+            # The command is logged above (logger.info "Running:") and
+            # returned in the JSON response for debugging.
 
             return jsonify({'status': 'started', 'command': full_cmd})
 
