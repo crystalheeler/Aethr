@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 import json
 import queue
+import re
+import socket
 import subprocess
 import threading
 import time
@@ -30,6 +32,77 @@ rtl_tcp_lock = threading.Lock()
 # Track which device is being used
 rtlamr_active_device: int | None = None
 rtlamr_active_sdr_type: str = 'rtlsdr'
+
+
+def _wait_for_rtl_tcp(host: str = '127.0.0.1', port: int = 1234,
+                      timeout: float = 30.0, interval: float = 0.25) -> bool:
+    """Poll a TCP port until rtl_tcp is accepting connections.
+
+    Replaces an unreliable ``time.sleep(3)`` warm-up. On a cold first launch
+    the Windows Firewall prompt for rtl_tcp can hold the bind back for more
+    than 3s, and rtlamr then fails its single connect attempt with
+    "connectex: No connection could be made because the target machine
+    actively refused it" and exits immediately.
+
+    Returns True when the port accepts a TCP connection, False on timeout.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1.0):
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(interval)
+    return False
+
+
+# rtlamr's stderr is structured Go slog text:
+#   time=... level=ERROR source=rtlamr\main.go:92 msg="..." error="..."
+_RTLAMR_LEVEL_RE = re.compile(r'\blevel=(\w+)')
+_RTLAMR_MSG_RE = re.compile(r'\bmsg="([^"]*)"')
+_RTLAMR_ERROR_FIELD_RE = re.compile(r'\berror="((?:[^"\\]|\\.)*)"')
+
+# rtlamr labels some chatter as level=ERROR even when it isn't an actionable
+# problem. "not keeping up with rtl_tcp" is a known-noisy warning on slower
+# CPUs that fires repeatedly without anything the user can act on.
+_RTLAMR_NOISE_MSGS = (
+    'not keeping up',
+)
+
+
+def _classify_rtlamr_stderr(line: str) -> tuple[str | None, str | None]:
+    """Decide whether an rtlamr stderr line should reach the UI.
+
+    Returns ``(event_type, text)`` to push as an SSE message, or
+    ``(None, None)`` to suppress (the line is still logged to debug).
+    Surfaces real errors as ``type: 'error'`` instead of the misleading
+    ``type: 'info'`` (blue toast) that the original code used for every
+    line — actual errors deserve red, and most rtlamr stderr lines are
+    not user-facing in the first place.
+    """
+    msg_m = _RTLAMR_MSG_RE.search(line)
+    msg = msg_m.group(1) if msg_m else line
+
+    # Noise — known-harmless chatter, debug-log only.
+    for needle in _RTLAMR_NOISE_MSGS:
+        if needle in msg:
+            return None, None
+
+    level_m = _RTLAMR_LEVEL_RE.search(line)
+    level = (level_m.group(1) if level_m else 'INFO').upper()
+
+    if level in ('ERROR', 'WARN', 'FATAL'):
+        err_m = _RTLAMR_ERROR_FIELD_RE.search(line)
+        if err_m:
+            # Show just the first line of multiline error= (rtlamr embeds
+            # a full Go stack trace via escaped \n; truncating keeps the
+            # toast readable).
+            err_text = err_m.group(1).split('\\n')[0]
+            return 'error', f'{msg}: {err_text}'
+        return 'error', msg
+
+    # INFO / DEBUG — log only, don't surface to UI.
+    return None, None
 
 
 def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
@@ -196,11 +269,34 @@ def start_rtlamr() -> Response:
                         rtlamr_active_device = None
                     return api_error(f'Failed to start rtl_tcp: {e}', 500)
 
-        # Wait for rtl_tcp to start outside lock
+        # Wait for rtl_tcp to actually be listening on 127.0.0.1:1234.
+        # On a cold first launch the Windows Firewall prompt can hold the
+        # bind back for more than the old fixed sleep(3); rtlamr makes a
+        # single connect attempt at startup and dies on refusal, so we
+        # have to KNOW the port is up before spawning it.
         if rtl_tcp_just_started:
-            time.sleep(3)
-            logger.info(f"rtl_tcp started: {rtl_tcp_cmd_str}")
-            app_module.rtlamr_queue.put({'type': 'info', 'text': f'rtl_tcp: {rtl_tcp_cmd_str}'})
+            if not _wait_for_rtl_tcp():
+                with rtl_tcp_lock:
+                    if rtl_tcp_process:
+                        with contextlib.suppress(Exception):
+                            rtl_tcp_process.terminate()
+                            rtl_tcp_process.wait(timeout=2)
+                        unregister_process(rtl_tcp_process)
+                        rtl_tcp_process = None
+                if rtlamr_active_device is not None:
+                    app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
+                    rtlamr_active_device = None
+                return api_error(
+                    'rtl_tcp did not start listening on 127.0.0.1:1234 within 30s. '
+                    'If Windows Firewall just prompted you, allow access and try '
+                    'Start again. Otherwise check that an RTL-SDR dongle is connected '
+                    'and not in use by another mode.',
+                    500,
+                )
+            logger.info(f"rtl_tcp listening on 127.0.0.1:1234 ({rtl_tcp_cmd_str})")
+            # NB: not pushing "rtl_tcp: ..." to UI — same rationale as the
+            # "Command: ..." cleanup in -d. Developer context, surfaces as a
+            # persistent info-style toast that reads like a notification.
 
         # Build rtlamr command (path resolved up front via get_tool_path)
         cmd = [
@@ -240,13 +336,19 @@ def start_rtlamr() -> Response:
             thread.daemon = True
             thread.start()
 
-            # Monitor stderr
+            # Monitor stderr — rtlamr is chatty on stderr (status, debug, all
+            # mixed in). The previous "every line as info toast" approach
+            # buried real errors in noise; classify each line and surface
+            # only actionable problems, with the correct severity.
             def monitor_stderr():
                 for line in app_module.rtlamr_process.stderr:
                     err = line.decode('utf-8', errors='replace').strip()
-                    if err:
-                        logger.debug(f"[rtlamr] {err}")
-                        app_module.rtlamr_queue.put({'type': 'info', 'text': f'[rtlamr] {err}'})
+                    if not err:
+                        continue
+                    logger.debug(f"[rtlamr] {err}")
+                    event_type, text = _classify_rtlamr_stderr(err)
+                    if event_type:
+                        app_module.rtlamr_queue.put({'type': event_type, 'text': text})
 
             stderr_thread = threading.Thread(target=monitor_stderr)
             stderr_thread.daemon = True
