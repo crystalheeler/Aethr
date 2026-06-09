@@ -1,3 +1,13 @@
+# Aethr — Project lineage & acknowledgments
+
+Aethr is maintained by [**crystalheeler**](https://github.com/crystalheeler). It is built on top of [`themuseum1960/intercept-test`](https://github.com/themuseum1960/intercept-test), which is itself based on [`smittix/intercept`](https://github.com/smittix/intercept).
+
+The GitHub **Contributors** panel on this repository is computed automatically from the full git commit history of the codebase. It lists everyone who has ever written code that ended up here — including authors from the upstream projects who have not contributed directly to Aethr. Their work is gratefully acknowledged, and copyright + attribution for that upstream code remains with the original authors (see [`LICENSE`](LICENSE)).
+
+If you're looking for the active maintainer of *this* project specifically, that's the account listed above; if you're looking for the original authors of any given piece of code, `git blame` (or the upstream repos linked above) is the authoritative source.
+
+---
+
 <p align="center">
   <img src="static/images/readme-banner.svg" alt="iNTERCEPT — Signal Intelligence Platform" width="100%">
 </p>
