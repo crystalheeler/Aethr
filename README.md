@@ -9,30 +9,22 @@ If you're looking for the active maintainer of *this* project specifically, that
 ---
 
 <p align="center">
-  <img src="static/images/readme-banner.svg" alt="iNTERCEPT — Signal Intelligence Platform" width="100%">
+  <strong style="font-size: 1.5em">Aethr</strong><br>
+  Signal Intelligence Platform<br>
+  <em>A web-based interface for software-defined radio tools.</em>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache 2.0 License">
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
 </p>
 
 <p align="center">
-Support the developer of this open-source project
+  <img src="static/images/screenshots/intercept-main.png" alt="Aethr main interface">
 </p>
 
-<p align="center">
-  <a href="https://www.buymeacoffee.com/smittix" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
-</p>
-<p align="center">
-  <strong>Signal Intelligence Platform</strong><br>
-  A web-based interface for software-defined radio tools.
-</p>
-
-<p align="center">
-  <img src="static/images/screenshots/intercept-main.png" alt="Screenshot">
-</p>
+> The screenshot above and the in-app branding still show the upstream "iNTERCEPT" identity. The Aethr UI redesign and logo are in progress; this README and the bundled assets will be updated as they land.
 
 ---
 
@@ -97,14 +89,17 @@ Troubleshooting (no decode / noisy decode):
 
 ## Installation / Windows
 
-Grab `intercept.exe` from the latest [Release](https://github.com/themuseum1960/intercept-test/releases),
+Grab `intercept.exe` from the latest [Release](https://github.com/crystalheeler/Aethr/releases),
 double-click it, then open <http://localhost:6969>. RTL-SDR hardware needs a
 one-time Zadig driver swap. Full guide: [docs/WINDOWS.md](docs/WINDOWS.md).
 
-A few modes (WiFi monitor mode, ACARS, APRS, DSC) can't work on Windows for
-platform-level reasons — they're surfaced with a clean "not supported" message
-in the dashboard. Linux/Docker is still the canonical deployment for full
-feature coverage.
+A few modes (WiFi monitor mode, DSC) can't work on Windows for platform-level
+reasons — they're surfaced with a clean "not supported" message in the
+dashboard. Linux/Docker is still the canonical deployment for full feature
+coverage.
+
+> The bundled Windows executable is still named `intercept.exe` for now — it
+> will be renamed alongside the broader rebrand once the UI redesign lands.
 
 ---
 
@@ -113,8 +108,8 @@ feature coverage.
 ### Quick Start
 
 ```bash
-git clone https://github.com/smittix/intercept.git
-cd intercept
+git clone https://github.com/crystalheeler/Aethr.git
+cd Aethr
 ./setup.sh          # Interactive menu (first run launches setup wizard)
 sudo ./start.sh
 ```
@@ -135,6 +130,11 @@ INTERCEPT Setup Menu
   7) View Status
   0) Exit
 ```
+
+> The setup script's menu still says "INTERCEPT" — that text comes from
+> `setup.sh` and will be rebranded in a future change along with the rest
+> of the in-app strings. Environment variable names (`INTERCEPT_*`) will
+> stay as-is for backwards compatibility with existing `.env` files.
 
 > **Production vs Dev server:** `start.sh` auto-detects gunicorn + gevent and runs a production server with cooperative greenlets — handles multiple SSE/WebSocket clients without blocking. Falls back to Flask dev server if gunicorn is not installed. For quick local development, you can still use `sudo -E venv/bin/python intercept.py` directly.
 
@@ -166,8 +166,8 @@ Multiple profiles can be combined (e.g. enter `1 3` for Core + Weather).
 ### Docker
 
 ```bash
-git clone https://github.com/smittix/intercept.git
-cd intercept
+git clone https://github.com/crystalheeler/Aethr.git
+cd Aethr
 docker compose --profile basic up -d --build
 ```
 
@@ -180,13 +180,13 @@ Cross-compile on an x64 machine and push to a registry. This is much faster than
 ```bash
 # One-time setup on your x64 build machine
 docker run --privileged --rm tonistiigi/binfmt --install all
-docker buildx create --name intercept-builder --use --bootstrap
+docker buildx create --name aethr-builder --use --bootstrap
 
 # Build and push for both architectures
 REGISTRY=ghcr.io/youruser ./build-multiarch.sh --push
 
 # On the RPi5, just pull and run
-INTERCEPT_IMAGE=ghcr.io/youruser/intercept:latest docker compose --profile basic up -d
+INTERCEPT_IMAGE=ghcr.io/youruser/aethr:latest docker compose --profile basic up -d
 ```
 
 Build script options:
@@ -206,7 +206,7 @@ If you've pushed to a registry, you can skip building entirely on the target mac
 
 ```bash
 # Set in .env or export
-INTERCEPT_IMAGE=ghcr.io/youruser/intercept:latest
+INTERCEPT_IMAGE=ghcr.io/youruser/aethr:latest
 
 # Then just run
 docker compose --profile basic up -d
@@ -290,26 +290,17 @@ The credentials can be changed in the ADMIN_USERNAME & ADMIN_PASSWORD variables 
 | **RTL-SDR** | Required for all SDR features | ~$25-35 |
 | **WiFi adapter** | Must support promiscuous (monitor) mode | ~$20-40 |
 | **Bluetooth adapter** | Device scanning (usually built-in) | - |
-| **GPS** | Any Linux supported GPS Unit | ~10 |
+| **GPS** | Any Linux supported GPS Unit | ~$10 |
 
 Most features work with a basic RTL-SDR dongle (RTL2832U + R820T2).
 
 | :exclamation:  Not using an RTL-SDR Device?   |
 |-----------------------------------------------
-|Intercept supports any device that SoapySDR supports. You must however have the correct module for your device installed! For example if you have an SDRPlay device you'd need to install soapysdr-module-sdrplay.
+| Aethr supports any device that SoapySDR supports. You must however have the correct module for your device installed! For example if you have an SDRPlay device you'd need to install soapysdr-module-sdrplay.
 
 | :exclamation:  GPS Usage   |
 |-----------------------------------------------
-|gpsd is needed for real time location. Intercept automatically checks to see if you're running gpsd in the background when any maps are rendered.
-
----
-
-## Discord Server
-
-<p align="center">
-  <a href="https://discord.gg/EyeksEJmWE">Join our Discord</a>
-</p>
-
+| gpsd is needed for real time location. Aethr automatically checks to see if you're running gpsd in the background when any maps are rendered.
 
 ---
 
@@ -320,12 +311,13 @@ Most features work with a basic RTL-SDR dongle (RTL2832U + R820T2).
 - [Hardware Guide](docs/HARDWARE.md) - SDR hardware and advanced setup
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Security](docs/SECURITY.md) - Network security and best practices
+- [Windows install + bundled binaries](docs/WINDOWS.md) - Zadig driver setup, mode support matrix
 
 ---
 
 ## Disclaimer
 
-This project was developed using AI as a coding partner, combining human direction with AI-assisted implementation. The goal: make Software Defined Radio more accessible by providing a clean, unified interface for common SDR tools.
+Aethr builds on iNTERCEPT, which was developed using AI as a coding partner — combining human direction with AI-assisted implementation. The goal: make Software Defined Radio more accessible by providing a clean, unified interface for common SDR tools. Aethr continues that pattern.
 
 **This software is for educational and authorized testing purposes only.**
 
@@ -339,9 +331,11 @@ This project was developed using AI as a coding partner, combining human directi
 
 Apache 2.0 License - see [LICENSE](LICENSE)
 
-## Author
+## Maintainer
 
-Created by **smittix** - [GitHub](https://github.com/smittix)
+Aethr is maintained by **[crystalheeler](https://github.com/crystalheeler)**.
+
+The underlying iNTERCEPT project was created by [**smittix**](https://github.com/smittix), and an earlier Windows-port fork was maintained at [`themuseum1960/intercept-test`](https://github.com/themuseum1960/intercept-test). See the lineage note at the top of this README for context.
 
 ## Acknowledgments
 
@@ -359,13 +353,3 @@ Created by **smittix** - [GitHub](https://github.com/smittix)
 [SatDump](https://github.com/SatDump/SatDump) |
 [Celestrak](https://celestrak.org/) |
 [Priyom.org](https://priyom.org/)
-
-
-
-
-
-
-
-
-
-
