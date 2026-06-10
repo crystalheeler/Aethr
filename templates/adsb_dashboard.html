@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIRCRAFT RADAR // Aethr - See the Invisible</title>
+    <title>AIRCRAFT RADAR // Aethr</title>
     <script>(function(){var t=localStorage.getItem('intercept-ui-tier')||'enhanced';document.documentElement.setAttribute('data-ui-tier',t);})();</script>
     <!-- Dedicated dashboards always use bundled assets so navigation is not
          blocked by external CDN reachability. -->
@@ -17,6 +17,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/adsb_dashboard.css') }}">
+    <!-- Aethr layered title bar (Phase 1B). Loaded LAST so its .ae-header /
+         .ae-logo rules win the cascade against adsb_dashboard.css's older
+         .header / .logo rules at tied specificity. The .ae-* selectors are
+         opt-in by markup class, so this file is inert until a template adds
+         the ae-* classes to its header element. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <!-- Deferred scripts -->
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
@@ -32,10 +38,29 @@
     <div class="radar-bg"></div>
     <div class="scanline"></div>
 
-    <header class="header">
-        <div class="logo">
-            AIRCRAFT RADAR
-            <span>// <span class="brand-i"><svg viewBox="36 14 28 68" width="1em" height="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="20" r="6" fill="#00ff88"/><rect x="44" y="33" width="12" height="45" rx="2" fill="#00d4ff"/><rect x="38" y="33" width="24" height="4" rx="1" fill="#00d4ff"/><rect x="38" y="74" width="24" height="4" rx="1" fill="#00d4ff"/></svg></span>NTERCEPT - See the Invisible</span>
+    {# Aethr layered title bar (Phase 1B). The previous markup rendered the
+       iNTERCEPT text-logo with a stylized SVG "i" + "NTERCEPT - See the
+       Invisible" string. Replaced with the layered ÆTHR lockup per the
+       handoff spec: wave-field background (driven by .ae-header CSS),
+       transparent raven emblem, live-text ÆTHR wordmark (JetBrains Mono Bold
+       with brand gradient), DejaVu Sans Mono dash + mode word. The
+       right-side .status-bar (agent selector) is unchanged. The nav row
+       lives directly below this header — never inside it. #}
+    <header class="header ae-header">
+        {# .ae-logo only (no .logo class). The old adsb_dashboard.css .logo span
+           rule sets `display: none` on mobile and font-size 14px on desktop,
+           which would clobber the new ae-wordmark-text / ae-dash / ae-mode
+           spans inside .ae-brand. The layered lockup has its own typography
+           rules so it doesn't need .logo's baseline. #}
+        <div class="ae-logo">
+            <img class="ae-emblem"
+                 src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                 alt="ÆTHR">
+            <div class="ae-brand">
+                <span class="ae-wordmark-text">&#xC6;THR</span>
+                <span class="ae-dash">&#x2014;</span>
+                <span class="ae-mode">AIRCRAFT</span>
+            </div>
         </div>
         <div class="status-bar">
             <!-- Agent Selector -->
