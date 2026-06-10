@@ -1,7 +1,8 @@
-title: iNTERCEPT
+title: Aethr
 description: Signal Intelligence Platform - A web-based interface for software-defined radio tools
-url: https://smittix.github.io
-baseurl: /intercept
+# url + baseurl intentionally unset — when GitHub Pages is enabled on
+# the Aethr repo it will pick the right values; leaving the upstream's
+# smittix.github.io URL here would deploy the site to the wrong place.
 
 # Build settings
 include:

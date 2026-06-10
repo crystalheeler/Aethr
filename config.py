@@ -15,10 +15,21 @@ import sys
 #     aa, bb, cc, …, zz     (doubled letter — 26 more)
 #     aaa, bbb, ccc, …, zzz (tripled letter — 26 more, cap)
 # Each new upstream version resets the suffix back to "-a".
-VERSION = "2.27.0-e"
+VERSION = "2.27.0-f"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.27.0-f",
+        "date": "June 2026",
+        "highlights": [
+            "Brand: in-app strings, page titles, server-down overlay, tray icon tooltip, and the About modal now say 'Aethr' instead of 'iNTERCEPT'. The rebrand is partial — env var names (INTERCEPT_*), the bundled binary name (intercept.exe), the setup script's menu strings, and the screenshot in the README still use the upstream identity. Those will follow once the larger UI redesign work lands. The logo SVG in the About modal has been replaced with a plain-text 'Aethr' placeholder until the new logo SVG is ready.",
+            "Brand: Windows runtime log path moved from %LOCALAPPDATA%\\\\INTERCEPT\\\\logs\\\\intercept.log to %LOCALAPPDATA%\\\\Aethr\\\\logs\\\\aethr.log. Old logs left in place — they're short-lived debug artifacts, not user-managed state.",
+            "Brand: docs/*.md prose updated to say Aethr instead of INTERCEPT/Intercept (USAGE, WINDOWS, HARDWARE, SECURITY, FEATURES, TROUBLESHOOTING, UI_GUIDE, DISTRIBUTED_AGENTS). docs/specs/* historical design notes left as-is intentionally — they describe decisions made when the project was iNTERCEPT.",
+            "Brand: GitHub-Pages site (docs/index.html + docs/_config.yml) repointed to crystalheeler/Aethr. The upstream CNAME (www.intercept-sigint.com) removed — neither this repo nor the themuseum1960 mirror owns it.",
+            "Brand: in-app export filenames updated — `intercept_messages.csv/json` and `intercept_device_intelligence.json` are now `aethr_*`. The localStorage / sessionStorage keys (`intercept-theme`, `intercept-ui-tier`, `intercept.default_mode`, etc.) intentionally left alone so existing users' preferences carry over.",
+        ],
+    },
     {
         "version": "2.27.0-e",
         "date": "June 2026",

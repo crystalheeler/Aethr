@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iNTERCEPT // See the Invisible</title>
+    <title>Aethr // See the Invisible</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0b1118">
@@ -41,7 +41,7 @@
     <!--
         Server-down detection and UI lockout.
 
-        Catches the case where the INTERCEPT backend has stopped responding
+        Catches the case where the Aethr backend has stopped responding
         (e.g. the user quit the tray icon, or the exe crashed) while a browser
         tab is still open. Two detection paths:
           1. Wrap window.fetch — any same-origin fetch that fails with
@@ -98,8 +98,8 @@
                 ov.innerHTML = [
                     '<div style="max-width:480px;padding:32px;background:#1a1a1a;border:1px solid #444;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.6);text-align:center">',
                         '<div style="font-size:48px;margin-bottom:16px;line-height:1">&#9888;</div>',
-                        '<h2 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#ff6b6b">INTERCEPT server stopped</h2>',
-                        '<p style="margin:0 0 8px 0;font-size:15px;line-height:1.5;color:#bbb">The INTERCEPT backend is no longer responding. It was probably quit (system tray &rarr; Quit) or crashed.</p>',
+                        '<h2 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#ff6b6b">Aethr server stopped</h2>',
+                        '<p style="margin:0 0 8px 0;font-size:15px;line-height:1.5;color:#bbb">The Aethr backend is no longer responding. It was probably quit (system tray &rarr; Quit) or crashed.</p>',
                         '<p style="margin:0 0 4px 0;font-size:13px;color:#888;line-height:1.5">Restart <code style="color:#ccc;background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:\'JetBrains Mono\',monospace">intercept.exe</code>, then click Reconnect.</p>',
                         '<p id="server-down-status" style="margin:16px 0 24px 0;font-size:12px;color:#666;font-family:\'JetBrains Mono\',monospace;min-height:16px"></p>',
                         '<div style="display:flex;gap:12px;justify-content:center">',
@@ -654,7 +654,7 @@
             <div class="warning-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
             <h2>DISCLAIMER</h2>
             <p>
-                <strong>iNTERCEPT</strong> is a signal intelligence tool designed for <strong>educational purposes
+                <strong>Aethr</strong> is a signal intelligence tool designed for <strong>educational purposes
                     only</strong>.
             </p>
             <p>By using this software, you acknowledge and agree that:</p>
@@ -733,7 +733,7 @@
                 <span></span>
                 <span></span>
             </button>
-            <a href="https://smittix.github.io/intercept" target="_blank" rel="noopener noreferrer" class="logo">
+            <a href="https://github.com/crystalheeler/Aethr" target="_blank" rel="noopener noreferrer" class="logo">
                 <svg width="50" height="50" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Signal brackets - left side -->
                     <path d="M15 30 Q5 50, 15 70" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"
@@ -6318,7 +6318,7 @@
                 ];
                 csv.push(row.join(','));
             });
-            downloadFile(csv.join('\n'), 'intercept_messages.csv', 'text/csv');
+            downloadFile(csv.join('\n'), 'aethr_messages.csv', 'text/csv');
         }
 
         function exportJSON() {
@@ -6327,7 +6327,7 @@
                 alert('No messages to export');
                 return;
             }
-            downloadFile(JSON.stringify(allMessages, null, 2), 'intercept_messages.json', 'application/json');
+            downloadFile(JSON.stringify(allMessages, null, 2), 'aethr_messages.json', 'application/json');
         }
 
         function downloadFile(content, filename, type) {
@@ -7980,7 +7980,7 @@
                     recentMessages: profile.messages.slice(0, 5).map(m => m.text)
                 });
             });
-            downloadFile(JSON.stringify(data, null, 2), 'intercept_device_intelligence.json', 'application/json');
+            downloadFile(JSON.stringify(data, null, 2), 'aethr_device_intelligence.json', 'application/json');
         }
 
         // Toggle recon panel collapse

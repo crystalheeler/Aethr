@@ -47,7 +47,7 @@ pip install --break-system-packages flask
 
 ### "TypeError: 'type' object is not subscriptable"
 
-This error occurs on Python 3.7 or 3.8. **INTERCEPT requires Python 3.9 or later.**
+This error occurs on Python 3.7 or 3.8. **Aethr requires Python 3.9 or later.**
 
 ```bash
 # Check your Python version
@@ -153,12 +153,12 @@ For non-RTL-SDR devices, ADS-B requires `readsb` compiled with SoapySDR support 
    readsb --device-type soapysdr --device driver=lime --net --quiet
    ```
 
-2. In Intercept's ADS-B dashboard:
+2. In Aethr's ADS-B dashboard:
    - Check the **"Remote"** checkbox
    - Enter Host: `localhost` and Port: `30003`
    - Click **START**
 
-3. Intercept will connect to readsb's SBS output on port 30003
+3. Aethr will connect to readsb's SBS output on port 30003
 
 **Option 2: Install readsb with SoapySDR support**
 
@@ -191,7 +191,7 @@ If `rx_fm` is installed, select your device from the SDR dropdown in the Listeni
 
 ### Setting up Icecast for Listening Post Audio
 
-The Listening Post uses Icecast for low-latency audio streaming (2-10 second latency). Intercept will automatically start Icecast when you begin listening, but you must install and configure it first.
+The Listening Post uses Icecast for low-latency audio streaming (2-10 second latency). Aethr will automatically start Icecast when you begin listening, but you must install and configure it first.
 
 **Install Icecast:**
 ```bash
@@ -239,7 +239,7 @@ brew services start icecast
 - Open http://localhost:8000 in your browser
 - You should see the Icecast status page
 
-**Configure Intercept (optional):**
+**Configure Aethr (optional):**
 
 The default configuration expects Icecast on `127.0.0.1:8000` with source password `hackme` and mount point `/listen.mp3`. To change these, modify the scanner config in your API calls or update the defaults in `routes/listening_post.py`:
 
@@ -256,7 +256,7 @@ scanner_config = {
 **Troubleshooting Icecast:**
 
 - **"Connection refused" errors**: Ensure Icecast is running on the configured port
-- **"Authentication failed"**: Check the source password matches between Icecast config and Intercept
+- **"Authentication failed"**: Check the source password matches between Icecast config and Aethr
 - **No audio playing**: Check Icecast status page (http://localhost:8000) to verify the mount point is active
 - **High latency**: Ensure nginx/reverse proxy isn't buffering - add `proxy_buffering off;` to nginx config
 
@@ -266,7 +266,7 @@ If the Listening Post shows "Icecast mount not active" errors or audio doesn't p
 
 **1. Check the console output for errors**
 
-Intercept now logs detailed error output. Look for lines starting with `[AUDIO]`:
+Aethr now logs detailed error output. Look for lines starting with `[AUDIO]`:
 ```
 [AUDIO] SDR errors: ...     # Problems with rtl_fm/rx_fm (SDR not connected, device busy)
 [AUDIO] FFmpeg errors: ...  # Problems with ffmpeg (wrong password, codec issues)
@@ -337,7 +337,7 @@ rtl_fm -M am -f 118000000 -s 24000 -r 24000 -g 40 2>/dev/null | \
 
 ### Permission denied when scanning
 
-Run INTERCEPT with sudo:
+Run Aethr with sudo:
 ```bash
 sudo ./start.sh
 ```

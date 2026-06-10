@@ -1,4 +1,4 @@
-# INTERCEPT Features
+# Aethr Features
 
 Complete feature list for all modules.
 
@@ -495,7 +495,7 @@ Deploy lightweight sensor nodes across multiple locations and aggregate data to 
 
 ## Offline Mode
 
-Run iNTERCEPT without internet connectivity by using bundled local assets.
+Run Aethr without internet connectivity by using bundled local assets.
 
 ### Bundled Assets
 - **Leaflet 1.9.4** - Map library with marker images

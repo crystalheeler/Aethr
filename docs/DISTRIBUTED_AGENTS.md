@@ -1,16 +1,16 @@
-# Intercept Distributed Agent System
+# Aethr Distributed Agent System
 
-This document describes the distributed agent architecture that allows multiple remote sensor nodes to feed data into a central Intercept controller.
+This document describes the distributed agent architecture that allows multiple remote sensor nodes to feed data into a central Aethr controller.
 
 ## Overview
 
 The agent system uses a hub-and-spoke architecture where:
-- **Controller**: The main Intercept instance that aggregates data from multiple agents
+- **Controller**: The main Aethr instance that aggregates data from multiple agents
 - **Agents**: Lightweight sensor nodes running on remote devices with SDR hardware
 
 ```
                     ┌─────────────────────────────────┐
-                    │      INTERCEPT CONTROLLER       │
+                    │        AETHR CONTROLLER         │
                     │         (port 6969)             │
                     │                                 │
                     │  - Web UI with agent selector   │
@@ -34,10 +34,10 @@ The agent system uses a hub-and-spoke architecture where:
 
 ### 1. Start the Controller
 
-The controller is the main Intercept application:
+The controller is the main Aethr application:
 
 ```bash
-cd intercept
+cd Aethr
 ./setup.sh            # First-time setup (choose install profiles)
 sudo ./start.sh       # Production server on http://localhost:6969
 ```

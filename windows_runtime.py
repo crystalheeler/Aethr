@@ -1,4 +1,4 @@
-"""Windows runtime launcher for INTERCEPT.
+"""Windows runtime launcher for Aethr.
 
 When intercept.exe is launched on Windows (PyInstaller, --windowed), it
 runs this module instead of going through ``app.main()``. The runtime:
@@ -33,11 +33,11 @@ import threading
 import webbrowser
 from pathlib import Path
 
-LOG_DIR_NAME = "INTERCEPT"
+LOG_DIR_NAME = "Aethr"
 
 
 def _setup_logging() -> Path:
-    """Send logs to %LOCALAPPDATA%\\INTERCEPT\\logs\\intercept.log.
+    """Send logs to %LOCALAPPDATA%\\Aethr\\logs\\aethr.log.
 
     No console means stdout/stderr are unwritable (PyInstaller --windowed
     binds them to NUL). Route Python logging to a file so the user can
@@ -46,7 +46,7 @@ def _setup_logging() -> Path:
     base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     log_dir = Path(base) / LOG_DIR_NAME / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "intercept.log"
+    log_path = log_dir / "aethr.log"
 
     handler = logging.FileHandler(log_path, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
@@ -86,7 +86,7 @@ def _make_tray_icon(open_url: str, on_quit) -> "pystray.Icon":  # noqa: F821
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quit", _quit),
     )
-    return pystray.Icon("INTERCEPT", image, "INTERCEPT — Signal Intelligence", menu)
+    return pystray.Icon("Aethr", image, "Aethr — Signal Intelligence", menu)
 
 
 def run() -> int:

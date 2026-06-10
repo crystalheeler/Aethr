@@ -1,6 +1,6 @@
-# iNTERCEPT UI Guide
+# Aethr UI Guide
 
-This guide documents the UI design system, components, and patterns used in iNTERCEPT.
+This guide documents the UI design system, components, and patterns used in Aethr.
 
 ## Table of Contents
 
@@ -478,7 +478,7 @@ For full-screen dashboards like ADSB, AIS, or Satellite:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MY DASHBOARD // iNTERCEPT</title>
+    <title>MY DASHBOARD // Aethr</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
 
     <!-- Design tokens (required) -->
@@ -509,7 +509,7 @@ For full-screen dashboards like ADSB, AIS, or Satellite:
         <div class="logo">
             <a href="/" style="color: inherit; text-decoration: none;">
                 MY DASHBOARD
-                <span>// iNTERCEPT</span>
+                <span>// Aethr</span>
             </a>
         </div>
         <div class="status-bar">

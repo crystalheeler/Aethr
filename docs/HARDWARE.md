@@ -8,7 +8,7 @@
 | **LimeSDR** | 0.1 - 3800 MHz | ~$300 | Wide range, requires SoapySDR |
 | **HackRF** | 1 - 6000 MHz | ~$300 | Ultra-wide range, requires SoapySDR |
 
-INTERCEPT automatically detects connected devices.
+Aethr automatically detects connected devices.
 
 ---
 
@@ -19,8 +19,8 @@ INTERCEPT automatically detects connected devices.
 The setup script provides an interactive menu with install profiles for selective installation:
 
 ```bash
-git clone https://github.com/smittix/intercept.git
-cd intercept
+git clone https://github.com/crystalheeler/Aethr.git
+cd Aethr
 ./setup.sh
 ```
 
@@ -232,7 +232,7 @@ services:
       - /dev/bus/usb:/dev/bus/usb
 ```
 
-INTERCEPT auto-detects both dongles inside the container via `rtl_test -t` and addresses them by device index (`-d 0`, `-d 1`).
+Aethr auto-detects both dongles inside the container via `rtl_test -t` and addresses them by device index (`-d 0`, `-d 1`).
 
 ### Quick reference
 
@@ -294,7 +294,7 @@ pip install -r requirements.txt
 
 ---
 
-## Running INTERCEPT
+## Running Aethr
 
 After installation:
 

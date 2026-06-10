@@ -1,4 +1,4 @@
-# INTERCEPT on Windows
+# Aethr on Windows
 
 The Windows build is a single-file `intercept.exe` (~140 MB) with the Python
 runtime, Flask app, and a curated set of SDR tools bundled inside. No Python
@@ -9,7 +9,7 @@ install required.
 
 ## Install
 
-1. Download `intercept.exe` from the latest [Releases page](https://github.com/themuseum1960/intercept-test/releases).
+1. Download `intercept.exe` from the latest [Releases page](https://github.com/crystalheeler/Aethr/releases).
 2. Put it anywhere — Desktop, Downloads, a dedicated folder. No installer.
 3. Plug in your RTL-SDR dongle.
 4. Install the WinUSB driver via **Zadig** (one-time, required — see below).
@@ -18,7 +18,7 @@ install required.
 No console window appears. After ~10-15 seconds (Windows Defender scans the
 exe, PyInstaller unpacks the bundled runtime), three things happen:
 
-1. A small INTERCEPT tray icon appears in your taskbar's notification area.
+1. A small Aethr tray icon appears in your taskbar's notification area.
 2. Your default browser opens to <http://localhost:6969>.
 3. The Werkzeug HTTP server is running in the background.
 
@@ -52,7 +52,7 @@ The first launch may take longer than later ones — Windows scans the ~140 MB
 exe with Defender, and PyInstaller unpacks the bundled runtime to a temp
 directory each launch.
 
-Windows Firewall will prompt for network access on first launch. INTERCEPT
+Windows Firewall will prompt for network access on first launch. Aethr
 serves locally on port 6969 — **Private networks** is enough. **Public
 networks** is fine to leave unchecked.
 
@@ -61,7 +61,7 @@ networks** is fine to leave unchecked.
 Since there's no console, runtime logs go to:
 
 ```
-%LOCALAPPDATA%\INTERCEPT\logs\intercept.log
+%LOCALAPPDATA%\Aethr\logs\aethr.log
 ```
 
 Paste the full path into the Run dialog (Win+R) to open the folder.
@@ -136,12 +136,12 @@ intercept.exe --port 5099
 Sometimes Windows hides new tray icons by default. Click the upward chevron
 (`^`) in your notification area to see hidden icons. Drag it to the visible
 section if you want it pinned. If it's truly not there, check
-`%LOCALAPPDATA%\INTERCEPT\logs\intercept.log` for startup errors.
+`%LOCALAPPDATA%\Aethr\logs\aethr.log` for startup errors.
 
 ### Debugging without a console
 
 The Windows exe is built with `console=False`, so stdout/stderr go nowhere
-visible. Logs land in `%LOCALAPPDATA%\INTERCEPT\logs\intercept.log` — open
+visible. Logs land in `%LOCALAPPDATA%\Aethr\logs\aethr.log` — open
 the folder by pasting that path into the Run dialog (Win+R).
 
 If you need a true live console for development, build a debug exe yourself
@@ -168,8 +168,8 @@ need elevation (TSCM RF scanning) will prompt with a clearer error.
 If you'd rather build the exe yourself:
 
 ```powershell
-git clone https://github.com/themuseum1960/intercept-test.git
-cd intercept-test
+git clone https://github.com/crystalheeler/Aethr.git
+cd Aethr
 python -m venv venv
 venv\Scripts\python.exe -m pip install -r requirements.txt
 venv\Scripts\python.exe -m pip install pyinstaller

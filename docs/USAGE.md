@@ -1,4 +1,4 @@
-# INTERCEPT Usage Guide
+# Aethr Usage Guide
 
 Detailed instructions for each mode.
 
@@ -51,7 +51,7 @@ Supports 200+ protocols including weather stations, TPMS, doorbells, and IoT dev
 
 ### Tracker Detection
 
-INTERCEPT automatically detects known trackers:
+Aethr automatically detects known trackers:
 - Apple AirTag
 - Tile
 - Samsung SmartTag
@@ -522,7 +522,7 @@ Deploy lightweight sensor nodes across multiple locations and aggregate data to 
 
 ### Setting Up an Agent
 
-1. **Install INTERCEPT** on the remote machine
+1. **Install Aethr** on the remote machine
 2. **Create config file** (`intercept_agent.cfg`):
    ```ini
    [agent]
@@ -546,7 +546,7 @@ Deploy lightweight sensor nodes across multiple locations and aggregate data to 
 
 ### Registering Agents in the Controller
 
-1. Navigate to `/controller/manage` in the main INTERCEPT instance
+1. Navigate to `/controller/manage` in the main Aethr instance
 2. Enter agent details:
    - **Name**: Must match config file (e.g., `sensor-node-1`)
    - **Base URL**: Agent address (e.g., `http://192.168.1.50:8020`)
@@ -570,12 +570,12 @@ For complete documentation, see [Distributed Agents Guide](DISTRIBUTED_AGENTS.md
 
 ## Webhooks & Notifications
 
-INTERCEPT has a built-in alert engine that fires webhooks when decoded events match configurable rules. This lets you forward pager messages (or events from any other mode) to Discord, Slack, n8n, Home Assistant, or any HTTP endpoint.
+Aethr has a built-in alert engine that fires webhooks when decoded events match configurable rules. This lets you forward pager messages (or events from any other mode) to Discord, Slack, n8n, Home Assistant, or any HTTP endpoint.
 
 ### How it works
 
 1. You configure **alert rules** via the Alerts UI — each rule defines which mode and event type to watch, optional match criteria, and a severity level.
-2. When an incoming event matches a rule, INTERCEPT stores it in the alert log and POSTs a JSON payload to your configured webhook URL.
+2. When an incoming event matches a rule, Aethr stores it in the alert log and POSTs a JSON payload to your configured webhook URL.
 3. All modes are supported: pager, sensor, ADS-B, AIS, ACARS, WiFi, Bluetooth, and more.
 
 ### Enable the webhook
@@ -602,7 +602,7 @@ ALERT_WEBHOOK_SECRET=mysecrettoken
 
 ### Create an alert rule
 
-1. Open the **Alerts** panel in INTERCEPT
+1. Open the **Alerts** panel in Aethr
 2. Click **New Rule**
 3. Configure:
    - **Mode**: `pager` (or any other mode, or leave blank to match all)
@@ -613,7 +613,7 @@ ALERT_WEBHOOK_SECRET=mysecrettoken
 
 ### Webhook payload format
 
-INTERCEPT sends a POST request with `Content-Type: application/json`:
+Aethr sends a POST request with `Content-Type: application/json`:
 
 ```json
 {
@@ -640,15 +640,15 @@ INTERCEPT sends a POST request with `Content-Type: application/json`:
 
 ### Sending to Discord
 
-Discord webhooks expect a specific JSON format (`content`, `embeds`), so you need a small relay between INTERCEPT and Discord. Two options:
+Discord webhooks expect a specific JSON format (`content`, `embeds`), so you need a small relay between Aethr and Discord. Two options:
 
 **Option A — No-code relay (recommended)**
 
-Use [n8n](https://n8n.io), [Make](https://make.com), or [Pipedream](https://pipedream.com) to receive INTERCEPT's webhook and forward it to Discord with a custom message template. Point `ALERT_WEBHOOK_URL` at your workflow's ingest URL.
+Use [n8n](https://n8n.io), [Make](https://make.com), or [Pipedream](https://pipedream.com) to receive Aethr's webhook and forward it to Discord with a custom message template. Point `ALERT_WEBHOOK_URL` at your workflow's ingest URL.
 
 **Option B — Self-hosted Python relay**
 
-Save this as `discord_relay.py` and run it alongside INTERCEPT:
+Save this as `discord_relay.py` and run it alongside Aethr:
 
 ```python
 from flask import Flask, request
@@ -714,7 +714,7 @@ Multiple rules can coexist — e.g. one rule for all pager traffic to a general 
 
 ## Configuration
 
-INTERCEPT can be configured via environment variables:
+Aethr can be configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|

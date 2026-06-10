@@ -1,10 +1,10 @@
 # Security Considerations
 
-INTERCEPT is designed as a **local signal intelligence tool** for personal use on trusted networks. This document outlines security considerations and best practices.
+Aethr is designed as a **local signal intelligence tool** for personal use on trusted networks. This document outlines security considerations and best practices.
 
 ## Network Binding
 
-By default, INTERCEPT binds to `0.0.0.0:6969`, making it accessible from any network interface. This is convenient for accessing the web UI from other devices on your local network, but has security implications:
+By default, Aethr binds to `0.0.0.0:6969`, making it accessible from any network interface. This is convenient for accessing the web UI from other devices on your local network, but has security implications:
 
 ### Recommendations
 
@@ -23,11 +23,11 @@ By default, INTERCEPT binds to `0.0.0.0:6969`, making it accessible from any net
    sudo ./start.sh -H 127.0.0.1
    ```
 
-3. **Trusted Networks Only**: Only run INTERCEPT on networks you trust. The application has no authentication mechanism.
+3. **Trusted Networks Only**: Only run Aethr on networks you trust. The application has no authentication mechanism.
 
 ## Authentication
 
-INTERCEPT does **not** include authentication. This is by design for ease of use as a personal tool. If you need to expose INTERCEPT to untrusted networks:
+Aethr does **not** include authentication. This is by design for ease of use as a personal tool. If you need to expose Aethr to untrusted networks:
 
 1. Use a reverse proxy (nginx, Caddy) with authentication
 2. Use a VPN to access your home network
@@ -35,7 +35,7 @@ INTERCEPT does **not** include authentication. This is by design for ease of use
 
 ## Security Headers
 
-INTERCEPT includes the following security headers on all responses:
+Aethr includes the following security headers on all responses:
 
 | Header | Value | Purpose |
 |--------|-------|---------|
@@ -58,7 +58,7 @@ All user inputs are validated before use:
 
 ## Subprocess Execution
 
-INTERCEPT executes external tools (rtl_fm, airodump-ng, etc.) via subprocess. Security measures:
+Aethr executes external tools (rtl_fm, airodump-ng, etc.) via subprocess. Security measures:
 
 - **No shell execution**: All subprocess calls use list arguments, not shell strings
 - **Input validation**: All user-provided arguments are validated before use
