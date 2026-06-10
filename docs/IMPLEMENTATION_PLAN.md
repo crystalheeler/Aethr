@@ -60,17 +60,35 @@ no SYSTEM menu; the right cluster matches the listed order.
 
 ---
 
-## Phase 3 — Standalone full-page dashboard model
+## Phase 3 — Full-bleed map layout for all map-based modes inside the SPA
 
-Every signal mode is a standalone full-page dashboard like Aircraft/Vessels: full-bleed
-Leaflet/CARTO map as the page background, a stats strip on top, panels floating over the map, and a
-controls bar along the bottom. Rebuild **APRS, Radiosonde, and Drones** onto this model (they are
-currently the embedded-card SPA layout). Do **not** bolt CSS hacks onto the card view — use the real
-dashboard page structure. Change each mode from its own template/JS; do not copy Aircraft's panels
-onto another mode.
+**This phase was inverted from the original plan.** The original §1.8 said every mode should become
+a standalone full-page dashboard. After a worktree preview the user chose **Option B**: full-bleed
+map layouts INSIDE the SPA shell, using the existing JS mode-switcher for transitions. See
+`CLAUDE.md` "Routing architecture for the new UI (decided — Option B)" for context.
 
-**Acceptance:** APRS, Radiosonde, and Drones each render full-bleed (map fills the page) with their
-own real content, matching the per-mode rules in UIChanges § 1.10.
+What this phase actually does under Option B:
+
+- **Fold Aircraft and Vessels INTO the SPA.** Extract the content from
+  `templates/adsb_dashboard.html` and `templates/ais_dashboard.html` into proper SPA mode partials
+  under `templates/partials/modes/aircraft.html` and `templates/partials/modes/vessels.html`. Wire
+  their JS modules into the SPA's `INTERCEPT_MODE_SCRIPT_MAP` / `INTERCEPT_MODE_STYLE_MAP`. Register
+  in `modeCatalog`. Hook into `switchMode()` for init/destroy lifecycle (Leaflet, SSE streams).
+- **Retire or redirect the standalone Flask routes** (`/adsb/dashboard`, `/ais/dashboard`) once the
+  SPA mode containers fully take over. Recommended: redirect to `/?mode=aircraft` /
+  `/?mode=vessels` for backwards compatibility with any existing bookmarks.
+- **Promote APRS, Radiosonde, and Drones from embedded-card to full-bleed inside the SPA.** They
+  stay in their existing SPA partials — no template restructure — but get full-bleed CSS that
+  makes their map fill the viewport below the title bar + nav, with their config sidebar
+  collapsing to a left CONFIG tab (per §1.9, picked up in Phase 4).
+- **Build from each mode's own source.** Same hard rule as before — do not paste Aircraft's panels
+  onto APRS, etc.
+
+**Acceptance:** Aircraft and Vessels are reachable via the SPA's mode-switcher (smooth transitions,
+no page reload), render full-bleed maps inside the SPA shell, and have all their original features
+(agent selector, ACARS/VDL2 tabs for Aircraft; agent selector for Vessels). APRS / Radiosonde /
+Drones each render full-bleed maps with their own real content, matching the per-mode rules in
+UIChanges § 1.10.
 
 ---
 

@@ -34,9 +34,19 @@ The project is being rebranded from **iNTERCEPT** to **Aethr** (styled visually 
 - **Use the provided assets as-is** (`static/img/aethr/*`). Don't regenerate, restyle, stretch, or re-roll them. The title-bar wave-field tile must never be stretched, and its wave phase must never be re-rolled.
 - **Iterate with rendered evidence.** Run the app and look before locking a change. Don't batch multiple phases into one commit — small landings, visual verification between each.
 
-### Routing architecture for the new UI (decided)
+### Routing architecture for the new UI (decided — Option B)
 
-Modes are standalone full-page dashboards (own template, own Flask route, own URL), all extending a shared `templates/layout/aethr_base.html` that owns the title bar, nav row, and status bar. Cross-mode navigation uses soft-nav (fetch + content swap + pushState) so the title bar and nav stay mounted across mode changes — only the dashboard content updates. This gives bookmarkable URLs AND seamless transitions without duplicating chrome across 8+ templates.
+**Every mode is an SPA mode container inside `templates/index.html`, with map-based modes using full-bleed CSS.** The SPA's existing JS mode-switcher handles all cross-mode navigation, so transitions are already smooth (no page reload, title bar / nav row stay mounted).
+
+This direction was confirmed by a worktree preview where Radiosonde was promoted to full-bleed inside the SPA and a sketch Aircraft fold-in was added — the user verified the experience and chose this over the soft-nav-between-standalones approach.
+
+Concrete implications:
+
+- **Aircraft and Vessels get folded INTO the SPA.** Their standalone templates (`templates/adsb_dashboard.html`, `templates/ais_dashboard.html`) get refactored into SPA mode partials under `templates/partials/modes/`. The standalone Flask routes (`/adsb/dashboard`, `/ais/dashboard`) either redirect to `/?mode=aircraft` / `?mode=vessels` or get retired.
+- **APRS / Radiosonde / Drones stay embedded in SPA** (no peel-out) but get full-bleed CSS layouts that match Aircraft/Vessels visually.
+- **`templates/layout/aethr_base.html` remains useful for any standalone pages that survive (Agents, Network Monitor, ADS-B History, Login)** but is no longer the primary mode template. Most modes live inside the SPA.
+- **No soft-nav layer needed.** The SPA's existing mode-switcher is the navigation mechanism. We don't need to intercept link clicks or do fetch+inject.
+- **Trade-off accepted: lose bookmarkable per-mode URLs.** `/adsb/dashboard` etc. become `/?mode=aircraft` (or `/#aircraft`) — workable via existing URL-param handling in the SPA.
 
 ### Brand quick-reference
 
