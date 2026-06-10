@@ -12,6 +12,10 @@ header.ae-header {
   position: relative;
   height: var(--ae-bar-h);
   min-height: var(--ae-bar-h);
+  /* Pull the header out of whatever lateral padding the existing per-template
+     CSS set (e.g. index.css: padding: 0 16px) so the wave field reaches the
+     window edges. Internal alignment is handled by .ae-logo and .status-bar. */
+  padding: 0;
   background-color: #0a0d12;
   background-image: url('/static/img/aethr/aethr-bg-tile.png');
   background-repeat: repeat-x;
@@ -24,7 +28,10 @@ header.ae-header {
   justify-content: space-between;
 }
 
-/* Remove iNTERCEPT's header scanline/overlay if it has one, so the tile reads cleanly. */
+/* Neutralize iNTERCEPT's header scanline overlays so the wave-field tile
+   reads cleanly. Both ::before (a top gradient strip in some templates) and
+   ::after (a bottom scanline in others) are suppressed. */
+header.ae-header::before,
 header.ae-header::after { display: none; }
 
 /* Left lockup: emblem + wordmark, floated over the wave field. */

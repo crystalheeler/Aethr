@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aethr // See the Invisible</title>
+    <title>Aethr</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0b1118">
@@ -248,6 +248,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/map-utils.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/waterfall.css') }}?v={{ version }}&r=wfdeck19">
+    <!-- Aethr layered title bar (Phase 1D). Loaded LAST in the static CSS
+         block so its .ae-* rules win the cascade against index.css's header
+         rules. The lazy mode-CSS loader below this doesn't touch the title
+         bar, so the cascade stays correct after mode switches. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <!-- Deferred scripts - Leaflet, Chart.js, observer-location -->
     <script defer src="{{ url_for('static', filename='js/core/observer-location.js') }}"></script>
     {% if offline_settings.assets_source == 'local' %}
@@ -725,7 +730,33 @@
             </button>
         </div>
     </div>
-    <header>
+    {# Aethr layered title bar (Phase 1D — SPA shell).
+
+       Previously this header rendered the iNTERCEPT signal-tower SVG inside
+       an <a class="logo"> link, followed by an <h1> with the brand-i SVG +
+       "NTERCEPT // See the Invisible" tagline. Replaced with the same
+       layered lockup the standalone dashboards use:
+
+         - .ae-header     wave-field tile background (45px tall)
+         - .ae-logo       emblem image + .ae-brand trio
+         - .ae-brand      ÆTHR wordmark (live text) + dash + mode word
+
+       The mode word here is DYNAMIC — it reflects the current SPA mode
+       (PAGER, SENSOR, METERS, WATERFALL, etc.). It's wrapped in
+       <a id="aeHomeLink"> to keep the "click logo to go home" behavior
+       the old <a class="logo"> link had — repointed from the GitHub repo
+       to the app root.
+
+       The mode word starts as "PAGER" (the SPA's default) and is updated
+       by setActiveModeIndicator() — same single source of truth that
+       already drives the legacy activeModeIndicator span on the right.
+
+       Kept on the right cluster (for now):
+         - active-mode-indicator (pulse dot + mode name)
+         - version-badge
+       Both are scheduled for tidying in Phase 6, after the highlighted-tab
+       indicator takes over as the active-mode signal. #}
+    <header class="header ae-header">
         <div class="header-left">
             <!-- Hamburger Menu Button (Mobile) -->
             <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation menu">
@@ -733,32 +764,16 @@
                 <span></span>
                 <span></span>
             </button>
-            <a href="https://github.com/crystalheeler/Aethr" target="_blank" rel="noopener noreferrer" class="logo">
-                <svg width="50" height="50" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Signal brackets - left side -->
-                    <path d="M15 30 Q5 50, 15 70" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"
-                        opacity="0.5" />
-                    <path d="M22 35 Q14 50, 22 65" stroke="#00d4ff" stroke-width="2.5" fill="none" stroke-linecap="round"
-                        opacity="0.7" />
-                    <path d="M29 40 Q23 50, 29 60" stroke="#00d4ff" stroke-width="2" fill="none" stroke-linecap="round" />
-                    <!-- Signal brackets - right side -->
-                    <path d="M85 30 Q95 50, 85 70" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"
-                        opacity="0.5" />
-                    <path d="M78 35 Q86 50, 78 65" stroke="#00d4ff" stroke-width="2.5" fill="none" stroke-linecap="round"
-                        opacity="0.7" />
-                    <path d="M71 40 Q77 50, 71 60" stroke="#00d4ff" stroke-width="2" fill="none" stroke-linecap="round" />
-                    <!-- The 'i' letter -->
-                    <!-- dot of i -->
-                    <circle cx="50" cy="22" r="6" fill="#00ff88" />
-                    <!-- stem of i with styled terminals -->
-                    <rect x="44" y="35" width="12" height="45" rx="2" fill="#00d4ff" />
-                    <!-- top terminal bar -->
-                    <rect x="38" y="35" width="24" height="4" rx="1" fill="#00d4ff" />
-                    <!-- bottom terminal bar -->
-                    <rect x="38" y="76" width="24" height="4" rx="1" fill="#00d4ff" />
-                </svg>
+            <a id="aeHomeLink" href="/" class="ae-logo" aria-label="Aethr home">
+                <img class="ae-emblem"
+                     src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                     alt="ÆTHR">
+                <div class="ae-brand">
+                    <span class="ae-wordmark-text">&#xC6;THR</span>
+                    <span class="ae-dash">&#x2014;</span>
+                    <span class="ae-mode" id="aeModeLabel">PAGER</span>
+                </div>
             </a>
-            <h1><span class="brand-i"><svg viewBox="36 14 28 68" width="1em" height="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="20" r="6" fill="#00ff88"/><rect x="44" y="33" width="12" height="45" rx="2" fill="#00d4ff"/><rect x="38" y="33" width="24" height="4" rx="1" fill="#00d4ff"/><rect x="38" y="74" width="24" height="4" rx="1" fill="#00d4ff"/></svg></span>NTERCEPT <span class="tagline">// See the Invisible</span></h1>
         </div>
         <div class="header-right">
             <span class="active-mode-indicator" id="activeModeIndicator"><span class="pulse-dot"></span>PAGER</span>
@@ -4117,14 +4132,30 @@
         }
 
         function setActiveModeIndicator(label) {
-            const indicator = document.getElementById('activeModeIndicator');
-            if (!indicator) return;
+            const text = String(label || '');
 
-            indicator.textContent = '';
-            const dot = document.createElement('span');
-            dot.className = 'pulse-dot';
-            indicator.appendChild(dot);
-            indicator.appendChild(document.createTextNode(String(label || '')));
+            // Legacy right-cluster indicator (pulse dot + mode name). Scheduled
+            // for cleanup in Phase 6 once the highlighted-tab is the canonical
+            // active-mode signal — until then, keep it in sync.
+            const indicator = document.getElementById('activeModeIndicator');
+            if (indicator) {
+                indicator.textContent = '';
+                const dot = document.createElement('span');
+                dot.className = 'pulse-dot';
+                indicator.appendChild(dot);
+                indicator.appendChild(document.createTextNode(text));
+            }
+
+            // Aethr title-bar mode word (Phase 1D). Single source of truth via
+            // this function — every caller that updates the legacy indicator
+            // now also updates the title bar, for free.
+            const aeMode = document.getElementById('aeModeLabel');
+            if (aeMode) {
+                // Strip any " @ <freq>" suffix that some callers append (e.g.
+                // Meters: "METERS @ 912.6 MHz") — the title-bar lockup is
+                // bounded width and shouldn't carry runtime parameters.
+                aeMode.textContent = text.split(' @ ')[0];
+            }
         }
 
         function applyKeyboardAccessibility(root = document) {
