@@ -253,6 +253,9 @@
          rules. The lazy mode-CSS loader below this doesn't touch the title
          bar, so the cascade stays correct after mode switches. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
+    <!-- Aethr full-bleed mode layouts (Phase 3A onward). Inert unless a JS
+         allowlist adds .ae-fullbleed-mode to <body> for the active mode. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-fullbleed-modes.css') }}">
     <!-- Deferred scripts - Leaflet, Chart.js, observer-location -->
     <script defer src="{{ url_for('static', filename='js/core/observer-location.js') }}"></script>
     {% if offline_settings.assets_source == 'local' %}
@@ -5021,6 +5024,22 @@
             // Update active mode indicator
             const modeMeta = modeCatalog[mode] || {};
             setActiveModeIndicator(modeMeta.indicator || mode.toUpperCase());
+
+            // Aethr Phase 3 — toggle the .ae-fullbleed-mode body class for
+            // modes that should render as full-bleed map dashboards inside
+            // the SPA shell. The class activates rules in
+            // static/css/aethr-fullbleed-modes.css that hide the left
+            // sidebar / expand the content column / tidy the right cluster
+            // and apply mode-specific full-bleed layouts.
+            //
+            // Allowlist grows as each mode is migrated. Currently:
+            //   radiosonde — Phase 3A (this commit)
+            //   aprs       — Phase 3B
+            //   drone      — Phase 3C
+            //   aircraft   — Phase 3 fold-in (own mode container)
+            //   vessels    — Phase 3 fold-in
+            const aeFullBleedModes = new Set(['radiosonde']);
+            document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedModes.has(mode));
             const wifiLayoutContainer = document.getElementById('wifiLayoutContainer');
             const btLayoutContainer = document.getElementById('btLayoutContainer');
             const satelliteVisuals = document.getElementById('satelliteVisuals');

@@ -1,0 +1,103 @@
+/* Aethr — full-bleed map layout for SPA mode containers.
+
+   Production-grade replacement for the Option B preview's CSS. Promotes a
+   mode's visuals container to fill the viewport below the title bar + nav
+   row, hides the SPA's left sidebar/mode-panel while active, and pushes
+   secondary content (lists, status strips) over the map as floating panels.
+
+   Scoped to `body.ae-fullbleed-mode` so styles are inert unless a JS
+   allowlist has flagged the current mode as full-bleed. Currently only
+   Radiosonde uses this (Phase 3A); APRS and Drones land as 3B/3C.
+
+   Reading guide:
+     :root                      shared chrome-height var
+     body.ae-fullbleed-mode     SPA shell adjustments while a full-bleed
+                                mode is active (hide sidebar, expand content,
+                                tidy right cluster)
+     #radiosondeVisuals         Radiosonde-specific full-bleed layout
+*/
+
+:root {
+  /* Title bar (45px from aethr-titlebar.css) + nav row. The nav row is
+     ~45px in the enhanced UI tier and shrinks in lean mode; 90px is a safe
+     working baseline for both. Fine-tune per-tier if visible alignment
+     issues turn up. */
+  --ae-chrome-h: 90px;
+}
+
+/* ----------------------------------------------------------------------------
+   Shared full-bleed mode behavior — applies to any mode in the allowlist.
+   ---------------------------------------------------------------------------- */
+
+/* Hide the SPA's left mode-panel (sidebar with mode controls). The plan's
+   §1.9 says these collapse to a left CONFIG tab — that's Phase 4 work; for
+   now we just hide. Specificity beats .mode-panel by one class. */
+body.ae-fullbleed-mode .mode-panel {
+  display: none;
+}
+
+/* Expand the content column to claim the width the sidebar freed up. */
+body.ae-fullbleed-mode .content {
+  margin-left: 0;
+  padding: 0;
+  width: 100vw;
+}
+
+/* Hide the legacy right-cluster active-mode-indicator and version-badge —
+   the new title-bar mode word is the canonical indicator. (These are
+   scheduled for removal in Phase 6 anyway; hiding them only in full-bleed
+   modes keeps them visible for the legacy SPA modes until that lands.) */
+body.ae-fullbleed-mode .header-right .active-mode-indicator,
+body.ae-fullbleed-mode .header-right .version-badge {
+  display: none;
+}
+
+/* ----------------------------------------------------------------------------
+   Radiosonde — full-bleed map with the balloon list as a floating left
+   panel over the map.
+   ---------------------------------------------------------------------------- */
+
+body.ae-fullbleed-mode #radiosondeVisuals {
+  position: fixed;
+  top: var(--ae-chrome-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: calc(100vh - var(--ae-chrome-h));
+  margin: 0;
+  padding: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary, #0a0d12);
+}
+
+/* Strip the card border + border-radius from the inner map container so
+   the map reads cleanly to the edges. */
+body.ae-fullbleed-mode #radiosondeMapContainer {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Float the balloon card list as a left panel over the map instead of a
+   stacked block below it. Sits under the stats strip; scrolls if it
+   overflows. */
+body.ae-fullbleed-mode #radiosondeCardContainer {
+  position: absolute;
+  top: 60px;          /* below the .radiosonde-strip */
+  left: 12px;
+  width: 280px;
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  z-index: 60;
+  background: rgba(10, 13, 18, 0.85);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-color, #1c2530);
+  border-radius: 6px;
+  padding: 8px;
+}
