@@ -4000,14 +4000,22 @@
             wefax: { label: 'WeFax', indicator: 'WEFAX', outputTitle: 'Weather Fax Decoder', group: 'space' },
             spaceweather: { label: 'Space Weather', indicator: 'SPACE WX', outputTitle: 'Space Weather Monitor', group: 'space' },
             meteor: { label: 'Meteor', indicator: 'METEOR', outputTitle: 'Meteor Scatter Monitor', group: 'space' },
+            // Aethr Phase 2 — group reassignments per Aethr-UIChanges.md §1.6.
+            // The old "wireless" group split into "wifi_bt" (locate tools) and
+            // "comms" (mesh networking). drone moved from "intel" to
+            // "tracking". The wifi/bluetooth scanner modes are no longer in
+            // the nav dropdowns (the SOON placeholders in TRACKING are their
+            // planned successors) but stay reachable via /?mode=wifi /
+            // /?mode=bluetooth and keep their original group string for
+            // backwards compatibility with anything that reads modeCatalog.
             wifi: { label: 'WiFi', indicator: 'WIFI', outputTitle: 'WiFi Scanner', group: 'wireless' },
             bluetooth: { label: 'Bluetooth', indicator: 'BLUETOOTH', outputTitle: 'Bluetooth Scanner', group: 'wireless' },
-            bt_locate: { label: 'BT Locate', indicator: 'BT LOCATE', outputTitle: 'BT Locate — SAR Tracker', group: 'wireless' },
-            wifi_locate: { label: 'WiFi Locate', indicator: 'WF LOCATE', outputTitle: 'WiFi Locate', group: 'wireless' },
-            meshtastic: { label: 'Meshtastic', indicator: 'MESHTASTIC', outputTitle: 'Meshtastic Mesh Monitor', group: 'wireless' },
-            meshcore: { label: 'Meshcore', indicator: 'MESHCORE', outputTitle: 'Meshcore Mesh Monitor', group: 'wireless' },
+            bt_locate: { label: 'BT Locate', indicator: 'BT LOCATE', outputTitle: 'BT Locate — SAR Tracker', group: 'wifi_bt' },
+            wifi_locate: { label: 'WiFi Locate', indicator: 'WF LOCATE', outputTitle: 'WiFi Locate', group: 'wifi_bt' },
+            meshtastic: { label: 'Meshtastic', indicator: 'MESHTASTIC', outputTitle: 'Meshtastic Mesh Monitor', group: 'comms' },
+            meshcore: { label: 'Meshcore', indicator: 'MESHCORE', outputTitle: 'Meshcore Mesh Monitor', group: 'comms' },
             tscm: { label: 'TSCM', indicator: 'TSCM', outputTitle: 'TSCM Counter-Surveillance', group: 'intel' },
-            drone: { label: 'Drone Intel', indicator: 'DRONE', outputTitle: 'Drone Intelligence', group: 'intel' },
+            drone: { label: 'Drones', indicator: 'DRONES', outputTitle: 'Drones', group: 'tracking' },
             spystations: { label: 'Spy Stations', indicator: 'SPY STATIONS', outputTitle: 'Spy Stations', group: 'intel' },
             websdr: { label: 'WebSDR', indicator: 'WEBSDR', outputTitle: 'HF/Shortwave WebSDR', group: 'intel' },
             waterfall: { label: 'Waterfall', indicator: 'WATERFALL', outputTitle: 'Spectrum Waterfall', group: 'signals' },

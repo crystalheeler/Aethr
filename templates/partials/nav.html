@@ -14,9 +14,18 @@
 
 {% set is_index_page = is_index_page|default(false) %}
 
-{% macro mode_item(mode, label, icon_svg, href=None) -%}
+{% macro mode_item(mode, label, icon_svg, href=None, soon=False) -%}
     {%- set is_active = 'active' if active_mode == mode else '' -%}
-    {%- if mode == 'satellite' %}
+    {%- if soon %}
+    {# Aethr Phase 2 — placeholder for a planned-but-not-yet-built mode.
+       Click is blocked; the SOON badge communicates intent. The existing
+       SPA mode (if any) is still reachable via /?mode={{ mode }}. #}
+    <button type="button" class="mode-nav-btn mode-nav-soon" disabled aria-disabled="true" aria-label="{{ label }} mode (coming soon)">
+        <span class="nav-icon icon">{{ icon_svg | safe }}</span>
+        <span class="nav-label">{{ label }}</span>
+        <span class="mode-nav-soon-badge">SOON</span>
+    </button>
+    {%- elif mode == 'satellite' %}
     <a href="/satellite/dashboard" target="_blank" rel="noopener noreferrer" class="mode-nav-btn {{ is_active }}" style="text-decoration: none;" data-mode="{{ mode }}" data-mode-label="{{ label }}" aria-label="{{ label }} mode">
         <span class="nav-icon icon">{{ icon_svg | safe }}</span>
         <span class="nav-label">{{ label }}</span>
@@ -39,9 +48,13 @@
     {%- endif %}
 {%- endmacro %}
 
-{% macro mobile_item(mode, label, icon_svg, href=None) -%}
+{% macro mobile_item(mode, label, icon_svg, href=None, soon=False) -%}
     {%- set is_active = 'active' if active_mode == mode else '' -%}
-    {%- if mode == 'satellite' %}
+    {%- if soon %}
+    <button type="button" class="mobile-nav-btn mode-nav-soon" disabled aria-disabled="true" aria-label="{{ label }} mode (coming soon)">
+        <span class="icon icon--sm">{{ icon_svg | safe }}</span> {{ label }} <span class="mode-nav-soon-badge">SOON</span>
+    </button>
+    {%- elif mode == 'satellite' %}
     <a href="/satellite/dashboard" target="_blank" rel="noopener noreferrer" class="mobile-nav-btn {{ is_active }}" style="text-decoration: none;" data-mode="{{ mode }}" data-mode-label="{{ label }}" aria-label="{{ label }} mode">
         <span class="icon icon--sm">{{ icon_svg | safe }}</span> {{ label }}
     </a>
@@ -59,6 +72,45 @@
     </a>
     {%- endif %}
 {%- endmacro %}
+
+{# Aethr Phase 2 — nav-only CSS for new components (SOON badge + AGENTS
+   direct link). Scoped tight so it doesn't touch other styles. #}
+<style>
+    /* SOON placeholder items — visually disabled, click blocked. */
+    .mode-nav-btn.mode-nav-soon,
+    .mobile-nav-btn.mode-nav-soon {
+        opacity: 0.45;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    .mode-nav-btn.mode-nav-soon .nav-icon,
+    .mode-nav-btn.mode-nav-soon .nav-label {
+        opacity: 0.85;
+    }
+    .mode-nav-soon-badge {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 5px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1.3;
+        color: #cfe9e7;
+        background: rgba(35, 182, 178, 0.18);
+        border: 1px solid rgba(35, 182, 178, 0.45);
+        border-radius: 3px;
+        font-family: 'JetBrains Mono', monospace;
+        vertical-align: baseline;
+    }
+
+    /* AGENTS top-level direct link — styled to look like a sibling of the
+       group dropdown buttons but without the dropdown chevron / behavior. */
+    .mode-nav-dropdown-btn.mode-nav-direct {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+</style>
 
 {# Desktop Navigation - uses existing CSS class names for compatibility #}
 <nav class="mode-nav" id="mainNav">
@@ -81,7 +133,12 @@
         </div>
     </div>
 
-    {# Tracking Group #}
+    {# Tracking Group — Phase 2 reorg.
+       Order per Aethr-UIChanges.md §1.6: Aircraft, Vessels, Radiosonde, APRS,
+       GPS, Drones, WiFi (SOON), Bluetooth (SOON). Drones moved here from
+       INTEL. WiFi/Bluetooth are placeholder/SOON entries for future map-based
+       tracking — the existing scanner SPA modes stay reachable via ?mode=wifi
+       / ?mode=bluetooth but are no longer in the nav dropdown. #}
     <div class="mode-nav-dropdown" data-group="tracking">
         <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('tracking')"{% endif %}>
             <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
@@ -92,9 +149,12 @@
         <div class="mode-nav-dropdown-menu">
             {{ mode_item('adsb', 'Aircraft', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>', '/adsb/dashboard') }}
             {{ mode_item('ais', 'Vessels', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg>', '/ais/dashboard') }}
+            {{ mode_item('radiosonde', 'Radiosonde', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><circle cx="12" cy="12" r="4"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/></svg>') }}
             {{ mode_item('aprs', 'APRS', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>') }}
             {{ mode_item('gps', 'GPS', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>') }}
-            {{ mode_item('radiosonde', 'Radiosonde', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><circle cx="12" cy="12" r="4"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/></svg>') }}
+            {{ mode_item('drone', 'Drones', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><line x1="8" y1="8" x2="9" y2="9"/><line x1="16" y1="8" x2="15" y2="9"/><line x1="8" y1="16" x2="9" y2="15"/><line x1="16" y1="16" x2="15" y2="15"/></svg>') }}
+            {{ mode_item('wifi_tracking', 'WiFi', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg>', soon=True) }}
+            {{ mode_item('bluetooth_tracking', 'Bluetooth', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg>', soon=True) }}
         </div>
     </div>
 
@@ -121,25 +181,30 @@
         </div>
     </div>
 
-    {# Wireless Group #}
-    <div class="mode-nav-dropdown" data-group="wireless">
-        <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('wireless')"{% endif %}>
-            <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
-            <span class="nav-label">Wireless</span>
+    {# WIFI/BT Group — Phase 2.
+       Was inside the old "Wireless" menu; promoted to its own top-level
+       group per §1.6. Contains the locate/SAR tools. The general WiFi
+       scanner + Bluetooth scanner SPA modes still exist (reachable via
+       ?mode=wifi / ?mode=bluetooth) but are no longer dropdown entries —
+       the SOON placeholders in TRACKING are their planned successors. #}
+    <div class="mode-nav-dropdown" data-group="wifi_bt">
+        <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('wifi_bt')"{% endif %}>
+            <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
+            <span class="nav-label">WiFi/BT</span>
             <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
 
         <div class="mode-nav-dropdown-menu">
-            {{ mode_item('wifi', 'WiFi', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg>') }}
-            {{ mode_item('bluetooth', 'Bluetooth', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg>') }}
             {{ mode_item('bt_locate', 'BT Locate', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/><path d="M9.5 8.5l3 3 2-4-2 4-3 3"/></svg>') }}
-            {{ mode_item('wifi_locate', 'WF Locate', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2"/><path d="M12 14v-2"/></svg>') }}
-            {{ mode_item('meshtastic', 'Meshtastic', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>') }}
-            {{ mode_item('meshcore', 'Meshcore', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>') }}
+            {{ mode_item('wifi_locate', 'WiFi Locate', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2"/><path d="M12 14v-2"/></svg>') }}
         </div>
     </div>
 
-    {# Intel Group #}
+    {# Intel Group — Phase 2.
+       Drone Intel moved out to TRACKING (now "Drones"). Analysis added as
+       a SOON placeholder per §1.6 — the analysis mode internals are
+       explicitly out of scope for the UI redesign so it stays disabled
+       until that work lands. #}
     <div class="mode-nav-dropdown" data-group="intel">
         <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('intel')"{% endif %}>
             <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -151,22 +216,35 @@
             {{ mode_item('tscm', 'TSCM', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') }}
             {{ mode_item('spystations', 'Spy Stations', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>') }}
             {{ mode_item('websdr', 'WebSDR', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>') }}
-            {{ mode_item('drone', 'Drone Intel', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><line x1="8" y1="8" x2="9" y2="9"/><line x1="16" y1="8" x2="15" y2="9"/><line x1="8" y1="16" x2="9" y2="15"/><line x1="16" y1="16" x2="15" y2="15"/></svg>') }}
+            {{ mode_item('analysis', 'Analysis', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>', soon=True) }}
         </div>
     </div>
 
-    {# System Group #}
-    <div class="mode-nav-dropdown" data-group="system">
-        <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('system')"{% endif %}>
-            <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
-            <span class="nav-label">System</span>
+    {# COMMS Group — Phase 2.
+       Was inside the old "Wireless" menu; promoted to its own top-level
+       group per §1.6. Mesh networking modes. #}
+    <div class="mode-nav-dropdown" data-group="comms">
+        <button type="button" class="mode-nav-dropdown-btn" aria-expanded="false"{% if is_index_page %} onclick="toggleNavDropdown('comms')"{% endif %}>
+            <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span>
+            <span class="nav-label">Comms</span>
             <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
 
         <div class="mode-nav-dropdown-menu">
-            {{ mode_item('system', 'Health', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>') }}
+            {{ mode_item('meshtastic', 'Meshtastic', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>') }}
+            {{ mode_item('meshcore', 'Mesh Core', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>') }}
         </div>
     </div>
+
+    {# AGENTS — Phase 2.
+       Top-level direct link to the standalone /agents page (no dropdown).
+       Replaces the old SYSTEM dropdown's slot at the right end of the
+       group cluster, before the utilities area. System Health moves to
+       the heartbeat icon in the right cluster below. #}
+    <a href="/agents" class="mode-nav-dropdown-btn mode-nav-direct {{ 'active' if active_mode == 'agents' else '' }}" data-group="agents" style="text-decoration: none;" aria-label="Remote Agents">
+        <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
+        <span class="nav-label">Agents</span>
+    </a>
 
     {# Dynamic dashboard button (shown when in satellite mode) #}
     <div class="mode-nav-actions">
@@ -218,6 +296,12 @@
             <button type="button" class="nav-tool-btn" onclick="window.KeyboardShortcuts && KeyboardShortcuts.showHelp()" title="Keyboard shortcuts (Alt+K)" aria-label="Keyboard shortcuts">
                 <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg></span>
             </button>
+            {# Aethr Phase 2 — system health heartbeat icon.
+               Replaces the old SYSTEM dropdown menu per §1.5. Links to the
+               existing system-health SPA mode. #}
+            <a href="/?mode=system" class="nav-tool-btn" title="System Health" aria-label="System health" style="text-decoration: none;">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+            </a>
             <button type="button" class="nav-tool-btn" onclick="showHelp()" title="Help & Documentation" aria-label="Open help">?</button>
             <button type="button" class="nav-tool-btn" onclick="logout(event)" title="Logout" aria-label="Logout">
                 <span class="power-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -240,14 +324,19 @@
         {{ mobile_item('ook', 'OOK', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h3"/><path d="M19 12h3"/><rect x="5" y="8" width="4" height="8" rx="1"/><rect x="10" y="9" width="4" height="6" rx="1"/><rect x="15" y="7" width="4" height="10" rx="1"/></svg>') }}
     </div>
 
-    {# Tracking Group #}
+    {# Tracking Group — Phase 2 reorg.
+       Same order as the desktop nav: Aircraft, Vessels, Radiosonde,
+       APRS, GPS, Drones, WiFi (SOON), Bluetooth (SOON). #}
     <div class="mobile-nav-group" data-group="tracking">
         <span class="mobile-nav-group-label">TRK</span>
         {{ mobile_item('adsb', 'Aircraft', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>', '/adsb/dashboard') }}
         {{ mobile_item('ais', 'Vessels', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg>', '/ais/dashboard') }}
+        {{ mobile_item('radiosonde', 'Sonde', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6"/><circle cx="12" cy="12" r="4"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/></svg>') }}
         {{ mobile_item('aprs', 'APRS', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>') }}
         {{ mobile_item('gps', 'GPS', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>') }}
-        {{ mobile_item('radiosonde', 'Sonde', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6"/><circle cx="12" cy="12" r="4"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/></svg>') }}
+        {{ mobile_item('drone', 'Drones', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>') }}
+        {{ mobile_item('wifi_tracking', 'WiFi', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>', soon=True) }}
+        {{ mobile_item('bluetooth_tracking', 'BT', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg>', soon=True) }}
     </div>
 
     {# Space Group #}
@@ -266,29 +355,37 @@
         {{ mobile_item('meteor', 'Meteor', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L2 22"/><path d="M18 2h4v4"/><circle cx="8" cy="16" r="4"/><path d="M16 6l-4 4"/></svg>') }}
     </div>
 
-    {# Wireless Group #}
-    <div class="mobile-nav-group" data-group="wireless">
-        <span class="mobile-nav-group-label">WLS</span>
-        {{ mobile_item('wifi', 'WiFi', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>') }}
-        {{ mobile_item('bluetooth', 'BT', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg>') }}
-        {{ mobile_item('bt_locate', 'Locate', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>') }}
+    {# WIFI/BT Group — Phase 2 (was inside the old Wireless menu). #}
+    <div class="mobile-nav-group" data-group="wifi_bt">
+        <span class="mobile-nav-group-label">W/BT</span>
+        {{ mobile_item('bt_locate', 'BT Loc', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>') }}
         {{ mobile_item('wifi_locate', 'WF Loc', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/><circle cx="12" cy="10" r="2"/></svg>') }}
-        {{ mobile_item('meshtastic', 'Mesh', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>') }}
-        {{ mobile_item('meshcore', 'Meshcore', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>') }}
     </div>
 
-    {# Intel Group #}
+    {# Intel Group — Phase 2 (Drone Intel moved out to TRACKING). #}
     <div class="mobile-nav-group" data-group="intel">
         <span class="mobile-nav-group-label">INT</span>
         {{ mobile_item('tscm', 'TSCM', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') }}
         {{ mobile_item('spystations', 'Spy', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>') }}
         {{ mobile_item('websdr', 'WebSDR', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>') }}
+        {{ mobile_item('analysis', 'Analysis', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>', soon=True) }}
     </div>
 
-    {# System Group #}
-    <div class="mobile-nav-group" data-group="system">
-        <span class="mobile-nav-group-label">SYS</span>
-        {{ mobile_item('system', 'System', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>') }}
+    {# COMMS Group — Phase 2 (was inside the old Wireless menu). #}
+    <div class="mobile-nav-group" data-group="comms">
+        <span class="mobile-nav-group-label">CMS</span>
+        {{ mobile_item('meshtastic', 'Mesh', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>') }}
+        {{ mobile_item('meshcore', 'Mesh Core', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>') }}
+    </div>
+
+    {# AGENTS — Phase 2 (direct link to /agents, replaces the old SYSTEM
+       slot at the right end of the group cluster). System Health moves
+       to the heartbeat icon in the utility cluster. #}
+    <div class="mobile-nav-group" data-group="agents">
+        <span class="mobile-nav-group-label">AGT</span>
+        <a href="/agents" class="mobile-nav-btn" style="text-decoration: none;" aria-label="Remote Agents">
+            <span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span> Agents
+        </a>
     </div>
 
     {# Utility Buttons (theme, settings, help) #}

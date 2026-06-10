@@ -7,7 +7,7 @@ Verify visually against the running app before moving on — iterate with eviden
 database & schema, Analysis-mode internals, auth/login changes, and anything marked
 "PENDING DECISION" below. If a task seems to need one of these, stop and ask.
 
-The full UI spec is `docs/SkyNet-UIChanges.md`. This plan is the build order.
+The full UI spec is `docs/Aethr-UIChanges.md`. This plan is the build order.
 
 ---
 
@@ -42,7 +42,8 @@ nav row unchanged below.
 
 ## Phase 2 — Top navigation + menus
 
-- **Nav order:** `SKYNET | SIGNALS | TRACKING | SPACE | WIFI/BT | INTEL | COMMS | AGENTS`.
+- **Nav order:** `SIGNALS | TRACKING | SPACE | WIFI/BT | INTEL | COMMS | AGENTS`.
+  No SKYNET menu (an earlier handoff doc listed it; dropped — Aethr branding lives in the title bar, not as a nav menu).
   No SYSTEM menu (system health → heartbeat icon in the right cluster). TSCM stays under INTEL.
 - **Right icon cluster (in order):** clock, layout-sidebar, LEAN, moon, world, database, settings,
   volume, file-text, keyboard, heartbeat (system health), help, logout.

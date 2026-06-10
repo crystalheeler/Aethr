@@ -1,8 +1,8 @@
-# SkyNet UI Changes
+# Aethr UI Changes
 
-*Companion to: SkyNet vs iNTERCEPT — Change Summary. Scope: UI changes that are not specific to Analysis mode. For Analysis-specific UI, see AnalysisImpl.*
+*UI changes for the Aethr project (rebrand of iNTERCEPT). Scope: UI changes that are not specific to Analysis mode. For Analysis-specific UI, see AnalysisImpl.*
 
-> **Updated after the Aethr-2 session.** Adds the ÆTHR branding/title bar (§ 1.7), the standalone full-page dashboard model (§ 1.8), the tab/menu interaction model (§ 1.9), the top-nav structure (§ 1.5), menu contents (§ 1.6), and per-mode behavior (§ 1.10). The project is now branded **ÆTHR** (Æ "ash" ligature); "SkyNet" persists in filenames and legacy references.
+> The project is branded **Aethr** in prose and **ÆTHR** (Æ "ash" ligature) in the title-bar wordmark only. Earlier handoff docs called the redesign "SkyNet" and listed a SKYNET top-level nav menu; those references have been removed — only the Aethr branding remains. See `CLAUDE.md` for the brand quick-reference.
 
 ## 1. Design Decisions
 
@@ -36,7 +36,7 @@ Locked-in decisions about the ÆTHR UI outside of Analysis mode.
 
 ### 1.5 Top navigation structure (NEW — locked)
 
-- Top nav order: **SKYNET | SIGNALS | TRACKING | SPACE | WIFI/BT | INTEL | COMMS | AGENTS**
+- Top nav order: **SIGNALS | TRACKING | SPACE | WIFI/BT | INTEL | COMMS | AGENTS** *(an earlier handoff doc listed SKYNET as the leftmost menu; dropped — Aethr branding lives in the title bar, not as a nav menu).*
 - No SYSTEM menu — system health moved to the heartbeat icon in the right cluster. TSCM stays under INTEL, not at top level.
 - Right icon cluster, in order: clock · layout-sidebar · LEAN · moon · world · database · settings · volume · file-text · keyboard · heartbeat (system health) · help · logout
 - Widget width: 1100px

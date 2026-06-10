@@ -18,7 +18,7 @@ These rules apply to ALL changes in this repo and take precedence over default b
 
 The project is being rebranded from **iNTERCEPT** to **Aethr** (styled visually as **ÆTHR** with the Æ "ash" ligature) and the UI is being reskinned. Scope and rules for the redesign are in:
 
-- `docs/SkyNet-UIChanges.md` — the full UI spec
+- `docs/Aethr-UIChanges.md` — the full UI spec
 - `docs/IMPLEMENTATION_PLAN.md` — UI-only, phased build order (start here)
 - `docs/aethr-header-snippet.html` — title-bar markup reference
 - `static/css/aethr-titlebar.css` — title-bar reference CSS
