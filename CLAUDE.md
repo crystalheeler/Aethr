@@ -14,6 +14,37 @@ These rules apply to ALL changes in this repo and take precedence over default b
 
 4. **Cross-platform parity for shared code.** If a fix lives in code that runs on every platform (routes, utils, templates, JS, CSS), it applies to Linux/macOS automatically — don't wrap it in a Windows-only guard unless the fix is genuinely platform-specific (e.g., a bundled binary path, a Windows API call, a path separator issue). When the change *is* platform-specific (e.g., bundling a Windows binary to unblock a mode), only the binary and its discovery path are Windows-scoped — the route/UI wiring that uses it stays shared so Linux keeps working through its own native install. Before declaring a change "Windows-only," ask whether the bug it fixes could also exist on Linux/macOS; if yes, fix it in the shared path. Conversely, when fixing a bug a user reported on Linux, check whether the same shared code path would misbehave on Windows and fix both in the same change.
 
+## UI redesign scope (in flight)
+
+The project is being rebranded from **iNTERCEPT** to **Aethr** (styled visually as **ÆTHR** with the Æ "ash" ligature) and the UI is being reskinned. Scope and rules for the redesign are in:
+
+- `docs/SkyNet-UIChanges.md` — the full UI spec
+- `docs/IMPLEMENTATION_PLAN.md` — UI-only, phased build order (start here)
+- `docs/aethr-header-snippet.html` — title-bar markup reference
+- `static/css/aethr-titlebar.css` — title-bar reference CSS
+- `static/img/aethr/` — title-bar assets (use as-is)
+
+### Hard rules for the UI redesign (do not violate)
+
+- **The redesign is UI-only.** Do not implement deployment, agent control, MQTT, packaging, mobile, database/schema changes, Analysis-mode internals, or auth — those have open decisions. If a task seems to need any of them, stop and ask.
+- **Stack does not change.** Flask + Jinja server-rendered templates, dark theme, SSE/WebSocket, Leaflet + CARTO tiles, vanilla JS + CSS under `static/`. No framework migration. Every iNTERCEPT decoder route stays intact (`dump1090`, `rtl_433`, `AIS-catcher`, `acarsdec`, `dumpvdl2`, `multimon-ng`, `SatDump`, `direwolf`, `aircrack-ng`, `bleak`).
+- **Build from the real source.** Never invent or infer UI structure — read the actual template / JS / CSS for the mode you're changing before touching it.
+- **Never copy one mode's structure onto another.** Each mode has its own layout; change each mode from its own code. Don't paste Aircraft's panels onto APRS, etc.
+- **No unrequested elements.** Don't add tabs, panels, buttons, or controls that aren't specified. This is the #1 recurring problem on the upstream project.
+- **Use the provided assets as-is** (`static/img/aethr/*`). Don't regenerate, restyle, stretch, or re-roll them. The title-bar wave-field tile must never be stretched, and its wave phase must never be re-rolled.
+- **Iterate with rendered evidence.** Run the app and look before locking a change. Don't batch multiple phases into one commit — small landings, visual verification between each.
+
+### Routing architecture for the new UI (decided)
+
+Modes are standalone full-page dashboards (own template, own Flask route, own URL), all extending a shared `templates/layout/aethr_base.html` that owns the title bar, nav row, and status bar. Cross-mode navigation uses soft-nav (fetch + content swap + pushState) so the title bar and nav stay mounted across mode changes — only the dashboard content updates. This gives bookmarkable URLs AND seamless transitions without duplicating chrome across 8+ templates.
+
+### Brand quick-reference
+
+- **Name in prose:** Aethr. **Name in visual lockup:** ÆTHR (the Æ "ash" ligature) — applies to the title-bar wordmark only, not anywhere else.
+- **Title-bar wordmark face:** JetBrains Mono Bold with the gradient `#2bb36a → #23b6b2 → #3a78c9 → #7e4fd0`.
+- **Dash and mode word:** DejaVu Sans Mono. Mode word color `#cfe9e7`. Muted dash `#5a6675`.
+- **Theme:** near-black background, cyan-teal primary, amber accent, monospace typography.
+
 ## Project Overview
 
 INTERCEPT is a web-based Signal Intelligence (SIGINT) platform providing a unified Flask interface for software-defined radio (SDR) tools. It supports pager decoding, 433MHz sensors, ADS-B aircraft tracking, ACARS messaging, WiFi/Bluetooth scanning, satellite tracking, ISS SSTV decoding, AIS vessel tracking, weather satellite imagery (NOAA APT & Meteor LRPT), and Meshtastic mesh networking.

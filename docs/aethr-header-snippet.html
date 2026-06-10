@@ -1,0 +1,41 @@
+<!-- ÆTHR title bar — header markup reference.
+     Replaces iNTERCEPT's text-logo header. Add class "ae-header" to <header>,
+     add class "ae-logo" to .logo and replace its contents. Keep the right-side
+     .status-bar (device/agent selector) exactly as it is. Do NOT touch the nav
+     include below — it stays as its own row beneath the title bar. -->
+
+<!-- BEFORE (iNTERCEPT, e.g. in adsb_dashboard.html): -->
+<!--
+<header class="header">
+    <div class="logo">
+        AIRCRAFT RADAR
+        <span>// <span class="brand-i">…</span>NTERCEPT - See the Invisible</span>
+    </div>
+    <div class="status-bar"> … device/agent selector … </div>
+</header>
+{% include 'partials/nav.html' %}
+-->
+
+<!-- AFTER (ÆTHR): -->
+<header class="header ae-header">
+    <div class="logo ae-logo">
+        <img class="ae-emblem" src="/static/img/aethr/aethr-emblem.png" alt="ÆTHR">
+        <img class="ae-wordmark" src="/static/img/aethr/aethr-wordmark.png" alt="ÆTHR — AIRCRAFT">
+    </div>
+
+    <!-- keep the existing right-side cluster unchanged -->
+    <div class="status-bar"> … device/agent selector … </div>
+</header>
+{% include 'partials/nav.html' %}
+
+<!-- MODE WORD: the wordmark asset bakes in "AIRCRAFT". For the other modes
+     (VESSELS / APRS / RADIOSONDE / DRONES / GPS) choose ONE in Phase 1:
+       (a) per-mode wordmark images: src="/static/img/aethr/aethr-wordmark-<mode>.png"
+       (b) live text lockup (see the commented block in aethr-titlebar.css),
+           e.g.:
+             <div class="ae-brand">
+               <span class="ae-wordmark-text">&#xC6;THR</span>
+               <span class="ae-dash">&#x2014;</span>
+               <span class="ae-mode">{{ mode_label }}</span>
+             </div>
+     Match either approach visually to the approved Aircraft bar before locking. -->

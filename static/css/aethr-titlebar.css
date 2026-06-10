@@ -1,0 +1,115 @@
+/* ÆTHR layered title bar — reference implementation.
+   Link this from the base layout (or each dashboard template's <head>):
+     <link rel="stylesheet" href="/static/css/aethr-titlebar.css">
+   See docs/aethr-header-snippet.html for the matching markup. */
+
+:root { --ae-bar-h: 45px; }
+
+/* The header becomes a continuous wave field. The tile is SEAMLESS and repeats on x;
+   background-size: auto 100% scales it to the bar height only (never stretched/skewed),
+   so the waves run edge-to-edge with no tile seams at any window width. */
+header.ae-header {
+  position: relative;
+  height: var(--ae-bar-h);
+  min-height: var(--ae-bar-h);
+  background-color: #0a0d12;
+  background-image: url('/static/img/aethr/aethr-bg-tile.png');
+  background-repeat: repeat-x;
+  background-position: left center;
+  background-size: auto 100%;
+  border-bottom: 1px solid #1c2530;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Remove iNTERCEPT's header scanline/overlay if it has one, so the tile reads cleanly. */
+header.ae-header::after { display: none; }
+
+/* Left lockup: emblem + wordmark, floated over the wave field. */
+.ae-logo {
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: 0 0 0 4px;
+  font-size: 0;          /* kill any inherited text from the old .logo */
+  border: 0;
+}
+
+.ae-emblem {
+  height: calc(var(--ae-bar-h) - 6px);
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0 9px 0 2px;
+}
+
+/* Transparent 'ÆTHR — <MODE>' wordmark asset. The teal glow follows the glyph alpha. */
+.ae-wordmark {
+  height: calc(var(--ae-bar-h) * 0.56);
+  width: auto;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 7px rgba(35, 182, 178, 0.60))
+          drop-shadow(0 0 15px rgba(35, 182, 178, 0.33));
+}
+
+/* Keep the right-side device/agent selector above the wave field. */
+header.ae-header .status-bar {
+  position: relative;
+  z-index: 2;
+}
+
+/* ----------------------------------------------------------------------------
+   Live-text wordmark lockup (chosen for this build).
+
+   The .ae-wordmark image rules above remain for the PNG-fallback case (asset
+   still ships in static/img/aethr/). Templates that use the live lockup render:
+
+     <div class="ae-brand">
+       <span class="ae-wordmark-text">ÆTHR</span>
+       <span class="ae-dash">—</span>
+       <span class="ae-mode">{{ mode_label }}</span>
+     </div>
+
+   ÆTHR is JetBrains Mono Bold with the brand gradient; the dash and mode word
+   are DejaVu Sans Mono. JetBrains Mono is bundled as a webfont so this renders
+   consistently across browsers and offline. */
+
+.ae-brand {
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+.ae-wordmark-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: calc(var(--ae-bar-h) * 0.46);
+  letter-spacing: 0.14em;
+  background: linear-gradient(90deg, #2bb36a, #23b6b2 34%, #3a78c9 64%, #7e4fd0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 9px rgba(35, 182, 178, 0.55));
+}
+
+.ae-dash {
+  color: #5a6675;
+  font-weight: 300;
+  margin: 0 0.5em;
+  font-family: 'DejaVu Sans Mono', 'JetBrains Mono', monospace;
+  font-size: calc(var(--ae-bar-h) * 0.46);
+}
+
+.ae-mode {
+  color: #cfe9e7;
+  letter-spacing: 0.14em;
+  font-family: 'DejaVu Sans Mono', 'JetBrains Mono', monospace;
+  font-size: calc(var(--ae-bar-h) * 0.42);
+}

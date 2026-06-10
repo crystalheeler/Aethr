@@ -1,0 +1,125 @@
+{# Aethr — shared base layout for standalone dashboards.
+
+Provides the layered Aethr title bar, the global nav row, the server-down
+overlay, and a `dashboard` content block. Each mode template extends this
+file and fills in:
+
+  - `title` block          — what shows in the browser tab
+  - `mode_label` block     — the title-bar mode word ("AIRCRAFT", "VESSELS", ...)
+  - `body_class` block     — optional extra body classes (e.g. data-mode value)
+  - `head_styles` block    — per-dashboard <link rel="stylesheet"> tags
+  - `head_scripts` block   — per-dashboard <script> tags loaded in <head>
+  - `status_bar` block     — the right-side cluster contents (agent selector, etc.)
+  - `dashboard` block      — the actual page body content
+  - `body_scripts` block   — per-dashboard <script> tags at end of body
+
+Bundled assets only (no CDN fallback) — same convention the existing
+adsb_dashboard / ais_dashboard / satellite_dashboard templates use, so the
+app works in offline / air-gapped deployments without external reachability.
+#}
+<!DOCTYPE html>
+<html lang="en"
+      class="{% if offline_settings and offline_settings.tile_provider in ['cartodb_dark', 'cartodb_dark_cyan'] %}map-cyber-enabled{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Aethr{% endblock %}</title>
+
+    {# UI tier preload — read localStorage before render so the right tier
+       CSS scope is active immediately. Matches the snippet in every existing
+       dashboard. #}
+    <script>(function(){var t=localStorage.getItem('intercept-ui-tier')||'enhanced';document.documentElement.setAttribute('data-ui-tier',t);})();</script>
+
+    {# Fonts (local-bundled). fonts-local.css covers Inter, JetBrains Mono, and
+       Roboto Condensed — all weights the UI uses. JetBrains Mono is also what
+       the Aethr title-bar wordmark renders in. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+
+    {# Leaflet (bundled). Every standalone dashboard maps, so loading here
+       saves a per-template include. If a dashboard somehow doesn't need it
+       the cost is one cached file. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+
+    {# Core CSS — design tokens, layout primitives, responsive rules. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/map-utils.css') }}">
+
+    {# Aethr title bar — the layered wave-field header. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
+
+    {# Settings / help modal styling — used by the nav row's settings + help
+       icons; shared chrome, loaded here so every dashboard gets it. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
+
+    {# Per-dashboard CSS — modes drop their own stylesheet links here. #}
+    {% block head_styles %}{% endblock %}
+
+    {# Observer location + per-mode JSON-injected globals (each dashboard's
+       template overrides as needed). Kept here in the base so the soft-nav
+       glue (Phase 1 follow-up) has a consistent place to read shared state. #}
+    <script>
+        window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
+        window.INTERCEPT_DEFAULT_LAT = {{ default_latitude | tojson }};
+        window.INTERCEPT_DEFAULT_LON = {{ default_longitude | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/core/utils.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/core/observer-location.js') }}"></script>
+
+    {# Per-dashboard <head> scripts — auto-start flags, mode-specific JSON
+       blobs, etc. Loaded BEFORE body content so any inline scripts in the
+       dashboard block can rely on them. #}
+    {% block head_scripts %}{% endblock %}
+</head>
+<body data-mode="{% block body_mode %}{% endblock %}"
+      class="{% block body_class %}{% endblock %}">
+
+    {# Background decoration carried over from the existing dashboards.
+       Each is its own DOM node so per-mode CSS can show/hide them. #}
+    <div class="radar-bg"></div>
+    <div class="scanline"></div>
+
+    {# Aethr layered title bar.
+       The wave-field tile is set via CSS on header.ae-header (repeat-x,
+       background-size: auto 100% — never stretched). The left lockup
+       (emblem + ÆTHR wordmark + dash + mode word) floats over the field.
+       The right-side .status-bar contents come from each dashboard via the
+       `status_bar` block (typically the agent selector). #}
+    <header class="header ae-header">
+        <div class="logo ae-logo">
+            <img class="ae-emblem"
+                 src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                 alt="ÆTHR">
+            <div class="ae-brand">
+                <span class="ae-wordmark-text">&#xC6;THR</span>
+                <span class="ae-dash">&#x2014;</span>
+                <span class="ae-mode">{% block mode_label %}{% endblock %}</span>
+            </div>
+        </div>
+        <div class="status-bar">
+            {% block status_bar %}{% endblock %}
+        </div>
+    </header>
+
+    {# Global nav row. Lives directly beneath the title bar — never inside it.
+       The nav partial reads `active_mode` from context to highlight the
+       current item; each dashboard sets it before {% include %}. #}
+    {% if not embedded %}
+    {% include 'partials/nav.html' with context %}
+    {% endif %}
+
+    {# Main dashboard content. #}
+    {% block dashboard %}{% endblock %}
+
+    {# Per-dashboard <script> tags — main mode JS, init calls, etc.
+       Note: the server-down overlay (shipped in v2.27.0-d) currently lives
+       inline in templates/index.html only. When standalone dashboards start
+       extending this base, that script will be extracted into a partial
+       (templates/partials/server_down_overlay.js) and included here so every
+       dashboard gets it. Tracking that as a follow-up to Phase 1. #}
+    {% block body_scripts %}{% endblock %}
+</body>
+</html>
