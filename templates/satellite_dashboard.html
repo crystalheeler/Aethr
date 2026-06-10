@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SATELLITE COMMAND // Aethr - See the Invisible</title>
+    <title>SATELLITE COMMAND // Aethr</title>
     <script>(function(){var t=localStorage.getItem('intercept-ui-tier')||'enhanced';document.documentElement.setAttribute('data-ui-tier',t);})();</script>
     <!-- Dedicated dashboards always use bundled assets so navigation is not
          blocked by external CDN reachability. -->
@@ -18,6 +18,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/satellite_dashboard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/map-utils.css') }}">
+    <!-- Aethr layered title bar (Phase 1C). Loaded LAST so its .ae-* rules
+         win the cascade against satellite_dashboard.css at tied specificity. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
     </script>
@@ -27,10 +30,19 @@
     <div class="grid-bg"></div>
     <div class="scanline"></div>
 
-    <header class="header">
-        <div class="logo">
-            SATELLITE COMMAND
-            <span>// <span class="brand-i"><svg viewBox="36 14 28 68" width="1em" height="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="20" r="6" fill="#00ff88"/><rect x="44" y="33" width="12" height="45" rx="2" fill="#00d4ff"/><rect x="38" y="33" width="24" height="4" rx="1" fill="#00d4ff"/><rect x="38" y="74" width="24" height="4" rx="1" fill="#00d4ff"/></svg></span>NTERCEPT - See the Invisible</span>
+    {# Aethr layered title bar (Phase 1C). Same layered lockup as the other
+       dashboards; mode word SATELLITE. The right cluster on this dashboard
+       is .stats-badges, not .status-bar — left unchanged. #}
+    <header class="header ae-header">
+        <div class="ae-logo">
+            <img class="ae-emblem"
+                 src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                 alt="ÆTHR">
+            <div class="ae-brand">
+                <span class="ae-wordmark-text">&#xC6;THR</span>
+                <span class="ae-dash">&#x2014;</span>
+                <span class="ae-mode">SATELLITE</span>
+            </div>
         </div>
         <div class="stats-badges">
             <div class="stat-badge">

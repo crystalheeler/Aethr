@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VESSEL RADAR // Aethr - See the Invisible</title>
+    <title>VESSEL RADAR // Aethr</title>
     <script>(function(){var t=localStorage.getItem('intercept-ui-tier')||'enhanced';document.documentElement.setAttribute('data-ui-tier',t);})();</script>
     <!-- Dedicated dashboards always use bundled assets so navigation is not
          blocked by external CDN reachability. -->
@@ -17,6 +17,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/map-utils.css') }}">
+    <!-- Aethr layered title bar (Phase 1C). Loaded LAST so its .ae-* rules
+         win the cascade against ais_dashboard.css at tied specificity. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <!-- Deferred scripts -->
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
@@ -31,10 +34,21 @@
     <div class="radar-bg"></div>
     <div class="scanline"></div>
 
-    <header class="header">
-        <div class="logo">
-            VESSEL RADAR
-            <span>// <span class="brand-i"><svg viewBox="36 14 28 68" width="1em" height="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="20" r="6" fill="#00ff88"/><rect x="44" y="33" width="12" height="45" rx="2" fill="#00d4ff"/><rect x="38" y="33" width="24" height="4" rx="1" fill="#00d4ff"/><rect x="38" y="74" width="24" height="4" rx="1" fill="#00d4ff"/></svg></span>NTERCEPT - AIS Tracking</span>
+    {# Aethr layered title bar (Phase 1C). Replaces the iNTERCEPT text-logo
+       with the same layered lockup used on Aircraft, with VESSELS as the
+       mode word. See templates/adsb_dashboard.html for the rationale on
+       dropping the .logo class (avoids the .logo span display:none cascade
+       from ais_dashboard.css). #}
+    <header class="header ae-header">
+        <div class="ae-logo">
+            <img class="ae-emblem"
+                 src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                 alt="ÆTHR">
+            <div class="ae-brand">
+                <span class="ae-wordmark-text">&#xC6;THR</span>
+                <span class="ae-dash">&#x2014;</span>
+                <span class="ae-mode">VESSELS</span>
+            </div>
         </div>
         <div class="status-bar">
             <!-- Agent Selector -->

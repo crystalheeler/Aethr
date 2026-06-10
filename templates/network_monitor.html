@@ -16,6 +16,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
+    <!-- Aethr layered title bar (Phase 1C). Loaded LAST so its .ae-* rules
+         win the cascade against any conflicting .header / .logo rules. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -538,10 +541,19 @@
     </style>
 </head>
 <body data-mode="controller_monitor">
-    <header class="header">
-        <div class="logo">
-            NETWORK MONITOR
-            <span>// MULTI-AGENT VIEW</span>
+    {# Aethr layered title bar (Phase 1C). Mode word NETWORK. The status row
+       below (Stream/Agents Online/etc.) is a separate .status-bar block
+       that lives outside the header on this page — left unchanged. #}
+    <header class="header ae-header">
+        <div class="ae-logo">
+            <img class="ae-emblem"
+                 src="{{ url_for('static', filename='img/aethr/aethr-emblem.png') }}"
+                 alt="ÆTHR">
+            <div class="ae-brand">
+                <span class="ae-wordmark-text">&#xC6;THR</span>
+                <span class="ae-dash">&#x2014;</span>
+                <span class="ae-mode">NETWORK</span>
+            </div>
         </div>
     </header>
 
