@@ -18,29 +18,42 @@
 */
 
 :root {
-  /* Title bar (45px from aethr-titlebar.css) + nav row. The nav row is
-     ~45px in the enhanced UI tier and shrinks in lean mode; 90px is a safe
-     working baseline for both. Fine-tune per-tier if visible alignment
-     issues turn up. */
-  --ae-chrome-h: 90px;
+  /* Title bar (45px from aethr-titlebar.css) + nav row. Matches the SPA's
+     own .main-content { height: calc(100vh - 96px) } chrome budget. */
+  --ae-chrome-h: 96px;
 }
 
 /* ----------------------------------------------------------------------------
    Shared full-bleed mode behavior — applies to any mode in the allowlist.
    ---------------------------------------------------------------------------- */
 
-/* Hide the SPA's left mode-panel (sidebar with mode controls). The plan's
-   §1.9 says these collapse to a left CONFIG tab — that's Phase 4 work; for
-   now we just hide. Specificity beats .mode-panel by one class. */
-body.ae-fullbleed-mode .mode-panel {
+/* Hide the SPA's left sidebar (mode controls). The plan's §1.9 says these
+   collapse to a left CONFIG tab — that's Phase 4 work; for now we hide.
+   The element is the .sidebar inside .main-content (id="mainSidebar"). */
+body.ae-fullbleed-mode .main-content > .sidebar {
   display: none;
 }
 
-/* Expand the content column to claim the width the sidebar freed up. */
-body.ae-fullbleed-mode .content {
-  margin-left: 0;
+/* Collapse the .main-content grid so the output panel takes the full width
+   the sidebar freed up. The SPA uses a CSS grid with explicit columns
+   (320px sidebar | 1fr content) — override to 1fr only. */
+body.ae-fullbleed-mode .main-content {
+  grid-template-columns: 1fr;
+}
+
+/* Output panel sits in the second grid column; flatten its padding and
+   background so the full-bleed mode visuals render edge-to-edge. */
+body.ae-fullbleed-mode .output-panel {
   padding: 0;
-  width: 100vw;
+  background: transparent;
+  overflow: visible;
+}
+
+/* Hide the per-mode output header (the "<mode name> Decoder" title bar
+   with stats chips) when in full-bleed — its presence makes the area
+   read as a card. The mode word in the title bar already labels things. */
+body.ae-fullbleed-mode .output-panel > .output-header {
+  display: none;
 }
 
 /* Hide the legacy right-cluster active-mode-indicator and version-badge —
