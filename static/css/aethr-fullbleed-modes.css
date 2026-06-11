@@ -24,14 +24,6 @@
   --ae-chrome-h: 96px;
 }
 
-/* Outer-edge gap diagnosis (Phase 3A iteration):
-   The body has noise/grid background patterns. To make it obvious where
-   #radiosondeVisuals actually starts (debug; remove once gap is resolved),
-   give it a teal-tinted background that contrasts with the body bg. If you
-   see teal flush against the nav row, the var is resolving correctly. If
-   you see body grid texture above the teal, --ae-chrome-h is wrong (or
-   the position:fixed isn't applying). */
-
 /* ----------------------------------------------------------------------------
    Shared full-bleed mode behavior — applies to any mode in the allowlist.
    ---------------------------------------------------------------------------- */
@@ -116,9 +108,7 @@ body.ae-fullbleed-mode #radiosondeVisuals {
   z-index: 50 !important;
   display: flex !important;
   flex-direction: column !important;
-  /* DIAGNOSTIC tint — see the comment block above. Replace with the
-     var(--bg-primary, ...) production color once the gap problem is fixed. */
-  background: rgba(35, 182, 178, 0.18) !important;
+  background: var(--bg-primary, #0a0d12) !important;
 }
 
 /* Strip the card border + border-radius from the inner map container so
@@ -129,6 +119,20 @@ body.ae-fullbleed-mode #radiosondeMapContainer {
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
+}
+
+/* Compact the radiosonde-strip in full-bleed mode. By default it has
+   padding + border + border-radius + a dark gradient, which on its own
+   reads fine inside a panel, but inside a full-bleed dark map it makes
+   the strip look like a big empty bar above the map. Strip the chrome,
+   transparent background, tighter padding. The waveform inside stays
+   intact (it's 40px tall via SignalWaveform.Live). */
+body.ae-fullbleed-mode .radiosonde-strip {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 4px 12px !important;
+  margin: 0 !important;
 }
 
 /* Float the balloon card list as a left panel over the map instead of a
