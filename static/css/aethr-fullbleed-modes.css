@@ -56,6 +56,22 @@ body.ae-fullbleed-mode .output-panel > .output-header {
   display: none !important;
 }
 
+/* Hide the bottom shared control bar (IDLE indicator + MODE/MUTE/AUTO-SCROLL
+   + EXPORT CSV/JSON/INTEL/CLEAR). It's a sibling of .output-header inside
+   .output-panel — same level — but distinct selector. For full-bleed modes
+   that have their own status strip (Radiosonde's STANDBY/BALLOONS strip)
+   this becomes redundant. */
+body.ae-fullbleed-mode .output-panel > .status-bar {
+  display: none !important;
+}
+
+/* Hide the sidebar expand handle (collapsed-sidebar chevron button) — with
+   the sidebar fully hidden in full-bleed mode, the button has nothing to
+   expand and would just float over the map. */
+body.ae-fullbleed-mode .output-panel > .sidebar-expand-handle {
+  display: none !important;
+}
+
 /* Hide the legacy right-cluster active-mode-indicator and version-badge —
    the new title-bar mode word is the canonical indicator. (These are
    scheduled for removal in Phase 6 anyway; hiding them only in full-bleed
