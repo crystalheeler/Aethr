@@ -18,10 +18,19 @@
 */
 
 :root {
-  /* Title bar (45px from aethr-titlebar.css) + nav row. Matches the SPA's
-     own .main-content { height: calc(100vh - 96px) } chrome budget. */
+  /* Title bar (45px from aethr-titlebar.css) + nav row (~44px from
+     index.css .mode-nav). The SPA's own .main-content is sized with
+     calc(100vh - 96px) so we match that. */
   --ae-chrome-h: 96px;
 }
+
+/* Outer-edge gap diagnosis (Phase 3A iteration):
+   The body has noise/grid background patterns. To make it obvious where
+   #radiosondeVisuals actually starts (debug; remove once gap is resolved),
+   give it a teal-tinted background that contrasts with the body bg. If you
+   see teal flush against the nav row, the var is resolving correctly. If
+   you see body grid texture above the teal, --ae-chrome-h is wrong (or
+   the position:fixed isn't applying). */
 
 /* ----------------------------------------------------------------------------
    Shared full-bleed mode behavior — applies to any mode in the allowlist.
@@ -107,7 +116,9 @@ body.ae-fullbleed-mode #radiosondeVisuals {
   z-index: 50 !important;
   display: flex !important;
   flex-direction: column !important;
-  background: var(--bg-primary, #0a0d12) !important;
+  /* DIAGNOSTIC tint — see the comment block above. Replace with the
+     var(--bg-primary, ...) production color once the gap problem is fixed. */
+  background: rgba(35, 182, 178, 0.18) !important;
 }
 
 /* Strip the card border + border-radius from the inner map container so
