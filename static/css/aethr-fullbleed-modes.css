@@ -97,19 +97,25 @@ body.ae-fullbleed-mode .header-right .version-badge {
 
 body.ae-fullbleed-mode #radiosondeVisuals {
   position: fixed !important;
-  top: var(--ae-chrome-h) !important;
+  /* DIAGNOSTIC: hardcoded top:0 to rule out CSS-var resolution issues.
+     If the container appears at the very top of the viewport (overlapping
+     the title bar), position:fixed itself is working — the var was the
+     problem. If it still sits below the chrome, position:fixed is being
+     overridden or an ancestor has transform/will-change creating a new
+     containing block. */
+  top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
-  height: calc(100vh - var(--ae-chrome-h)) !important;
+  height: 100vh !important;
   margin: 0 !important;
   padding: 0 !important;
   z-index: 50 !important;
   display: flex !important;
   flex-direction: column !important;
-  background: rgba(255, 0, 255, 0.35) !important;  /* DIAGNOSTIC: magenta = the container itself */
-  outline: 4px solid lime !important;                /* DIAGNOSTIC: lime outline = container boundary */
+  background: rgba(255, 0, 255, 0.35) !important;
+  outline: 4px solid lime !important;
 }
 
 /* DIAGNOSTIC v2 — visualize each child of #radiosondeVisuals with a
