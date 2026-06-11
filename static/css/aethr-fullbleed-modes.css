@@ -111,28 +111,31 @@ body.ae-fullbleed-mode #radiosondeVisuals {
   background: var(--bg-primary, #0a0d12) !important;
 }
 
-/* Strip the card border + border-radius from the inner map container so
-   the map reads cleanly to the edges. */
+/* DIAGNOSTIC v2 — visualize each child of #radiosondeVisuals with a
+   distinct loud background so we can see exactly where each one is and
+   how tall it actually rendered. Revert to production colors once the
+   gap is understood. */
 body.ae-fullbleed-mode #radiosondeMapContainer {
   flex: 1 !important;
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
-  background: transparent !important;
+  background: rgba(0, 100, 255, 0.30) !important;  /* blue tint = map area */
 }
 
-/* Compact the radiosonde-strip in full-bleed mode. By default it has
-   padding + border + border-radius + a dark gradient, which on its own
-   reads fine inside a panel, but inside a full-bleed dark map it makes
-   the strip look like a big empty bar above the map. Strip the chrome,
-   transparent background, tighter padding. The waveform inside stays
-   intact (it's 40px tall via SignalWaveform.Live). */
 body.ae-fullbleed-mode .radiosonde-strip {
-  background: transparent !important;
+  background: rgba(255, 100, 0, 0.55) !important;  /* orange = the strip */
   border: 0 !important;
   border-radius: 0 !important;
   padding: 4px 12px !important;
   margin: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Make .radiosonde-strip-inner outline visible too — sometimes the
+   visible "strip" is actually .strip-inner with its own positioning. */
+body.ae-fullbleed-mode .radiosonde-strip-inner {
+  outline: 2px dashed yellow !important;
 }
 
 /* Float the balloon card list as a left panel over the map instead of a

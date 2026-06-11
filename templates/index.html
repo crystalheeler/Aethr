@@ -254,8 +254,10 @@
          bar, so the cascade stays correct after mode switches. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-titlebar.css') }}">
     <!-- Aethr full-bleed mode layouts (Phase 3A onward). Inert unless a JS
-         allowlist adds .ae-fullbleed-mode to <body> for the active mode. -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-fullbleed-modes.css') }}">
+         allowlist adds .ae-fullbleed-mode to <body> for the active mode.
+         Version-suffixed so browser cache doesn't serve a stale copy across
+         exe rebuilds. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/aethr-fullbleed-modes.css') }}?v={{ version }}&r=fullbleed2">
     <!-- Deferred scripts - Leaflet, Chart.js, observer-location -->
     <script defer src="{{ url_for('static', filename='js/core/observer-location.js') }}"></script>
     {% if offline_settings.assets_source == 'local' %}
