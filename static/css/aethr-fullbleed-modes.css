@@ -31,29 +31,29 @@
    collapse to a left CONFIG tab — that's Phase 4 work; for now we hide.
    The element is the .sidebar inside .main-content (id="mainSidebar"). */
 body.ae-fullbleed-mode .main-content > .sidebar {
-  display: none;
+  display: none !important;
 }
 
 /* Collapse the .main-content grid so the output panel takes the full width
    the sidebar freed up. The SPA uses a CSS grid with explicit columns
    (320px sidebar | 1fr content) — override to 1fr only. */
 body.ae-fullbleed-mode .main-content {
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr !important;
 }
 
 /* Output panel sits in the second grid column; flatten its padding and
    background so the full-bleed mode visuals render edge-to-edge. */
 body.ae-fullbleed-mode .output-panel {
-  padding: 0;
-  background: transparent;
-  overflow: visible;
+  padding: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
 }
 
 /* Hide the per-mode output header (the "<mode name> Decoder" title bar
    with stats chips) when in full-bleed — its presence makes the area
    read as a card. The mode word in the title bar already labels things. */
 body.ae-fullbleed-mode .output-panel > .output-header {
-  display: none;
+  display: none !important;
 }
 
 /* Hide the legacy right-cluster active-mode-indicator and version-badge —
@@ -62,38 +62,46 @@ body.ae-fullbleed-mode .output-panel > .output-header {
    modes keeps them visible for the legacy SPA modes until that lands.) */
 body.ae-fullbleed-mode .header-right .active-mode-indicator,
 body.ae-fullbleed-mode .header-right .version-badge {
-  display: none;
+  display: none !important;
 }
 
 /* ----------------------------------------------------------------------------
    Radiosonde — full-bleed map with the balloon list as a floating left
    panel over the map.
+
+   !important is used on the layout primitives below not because specificity
+   would normally lose (the body-class + id selectors out-specify the
+   per-mode CSS) but because the per-mode `radiosonde.css` is lazy-loaded by
+   the SPA AFTER this file, and one of its rules (e.g. on
+   `.radiosonde-visuals-container`) could otherwise win at tied specificity
+   on later cascade order. Keeping the !important reservoir here makes the
+   rules robust against future per-mode CSS additions too.
    ---------------------------------------------------------------------------- */
 
 body.ae-fullbleed-mode #radiosondeVisuals {
-  position: fixed;
-  top: var(--ae-chrome-h);
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: calc(100vh - var(--ae-chrome-h));
-  margin: 0;
-  padding: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-primary, #0a0d12);
+  position: fixed !important;
+  top: var(--ae-chrome-h) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - var(--ae-chrome-h)) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 50 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: var(--bg-primary, #0a0d12) !important;
 }
 
 /* Strip the card border + border-radius from the inner map container so
    the map reads cleanly to the edges. */
 body.ae-fullbleed-mode #radiosondeMapContainer {
-  flex: 1;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  flex: 1 !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 
 /* Float the balloon card list as a left panel over the map instead of a

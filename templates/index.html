@@ -5039,7 +5039,10 @@
             //   aircraft   — Phase 3 fold-in (own mode container)
             //   vessels    — Phase 3 fold-in
             const aeFullBleedModes = new Set(['radiosonde']);
-            document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedModes.has(mode));
+            const aeFullBleedActive = aeFullBleedModes.has(mode);
+            document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedActive);
+            // Temporary diagnostic — remove once Phase 3 full-bleed is locked.
+            try { console.info('[ae-fullbleed]', { mode, active: aeFullBleedActive, hasClass: document.body.classList.contains('ae-fullbleed-mode') }); } catch (_) {}
             const wifiLayoutContainer = document.getElementById('wifiLayoutContainer');
             const btLayoutContainer = document.getElementById('btLayoutContainer');
             const satelliteVisuals = document.getElementById('satelliteVisuals');
