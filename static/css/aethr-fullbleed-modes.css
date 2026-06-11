@@ -81,17 +81,6 @@ body.ae-fullbleed-mode .header-right .version-badge {
   display: none !important;
 }
 
-/* Hide the legacy iNTERCEPT "Run State" strip (sits between the title bar
-   and the nav row, ~60px tall). Per IMPLEMENTATION_PLAN.md Phase 6 it gets
-   removed entirely once the highlighted nav tab becomes the canonical
-   active-mode signal; hiding it in full-bleed modes now is a preview of
-   that change AND removes ~60px from the chrome so #radiosondeVisuals at
-   top: --ae-chrome-h (96px) lines up against the nav row instead of
-   leaving a gap. */
-body.ae-fullbleed-mode #runStateStrip {
-  display: none !important;
-}
-
 /* ----------------------------------------------------------------------------
    Radiosonde — full-bleed map with the balloon list as a floating left
    panel over the map.

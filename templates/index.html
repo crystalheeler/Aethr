@@ -784,17 +784,12 @@
         </div>
     </header>
 
-    <div id="runStateStrip" class="run-state-strip" aria-live="polite">
-        <div class="run-state-left">
-            <span class="run-state-label">Run State</span>
-            <div id="runStateChips"></div>
-        </div>
-        <div class="run-state-right">
-            <span id="runStateSummary" class="run-state-value">Loading...</span>
-            <button id="runStateRefreshBtn" class="run-state-btn" type="button">Refresh</button>
-            <button id="runStateSettingsBtn" class="run-state-btn" type="button">Tools</button>
-        </div>
-    </div>
+    {# Legacy iNTERCEPT "Run State" strip used to live here, ~60px tall,
+       showing per-mode active chips + a Refresh / Tools button cluster.
+       Removed in Phase 6 (Aethr-UIChanges.md §1.3 + §2.3) — the highlighted
+       nav tab is now the canonical active-mode signal. The per-mode
+       capture-activity chips will be redesigned and reborn in a new spot
+       once §2.3 is locked. #}
 
     <!-- Mode Navigation Bar -->
     {% set is_index_page = true %}
@@ -5039,10 +5034,7 @@
             //   aircraft   — Phase 3 fold-in (own mode container)
             //   vessels    — Phase 3 fold-in
             const aeFullBleedModes = new Set(['radiosonde']);
-            const aeFullBleedActive = aeFullBleedModes.has(mode);
-            document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedActive);
-            // Temporary diagnostic — remove once Phase 3 full-bleed is locked.
-            try { console.info('[ae-fullbleed]', { mode, active: aeFullBleedActive, hasClass: document.body.classList.contains('ae-fullbleed-mode') }); } catch (_) {}
+            document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedModes.has(mode));
             const wifiLayoutContainer = document.getElementById('wifiLayoutContainer');
             const btLayoutContainer = document.getElementById('btLayoutContainer');
             const satelliteVisuals = document.getElementById('satelliteVisuals');
@@ -16880,7 +16872,6 @@
     <script src="{{ url_for('static', filename='js/core/recordings.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/ui-feedback.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/sse-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/core/run-state.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/command-palette.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/first-run-setup.js') }}"></script>
 

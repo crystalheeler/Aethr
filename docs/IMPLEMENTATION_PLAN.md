@@ -125,12 +125,15 @@ the collapsed state fills the map; the map-only button highlights only when acti
 
 ## Phase 6 — Run-state + popout cleanup (UI only)
 
-- Remove iNTERCEPT's "Run State = which mode owns the SDR" indicator — the highlighted active tab IS
-  the indicator.
-- Any popout shares state with the main app; single-instance per analyst; the original tab stays put
-  on whatever mode it was on.
+- **DONE** (out of order, landed during Phase 3A): the iNTERCEPT "Run State = which mode owns the
+  SDR" strip (`#runStateStrip` + `run-state.js` + the run-state CSS in `ux-platform.css`) was
+  removed wholesale from the SPA. The per-mode capture-activity chips that lived inside it will be
+  redesigned and reborn somewhere new per Aethr-UIChanges.md §2.3.
+- Still remaining for this phase: popout behavior — any popout shares state with the main app;
+  single-instance per analyst; the original tab stays put on whatever mode it was on. Tied to
+  §2.2 (legacy popout dashboards).
 
-**Acceptance:** no standalone SDR-ownership run-state widget remains; popouts (if kept) share state.
+**Acceptance:** no standalone SDR-ownership run-state widget remains (done); popouts (if kept) share state.
 
 ---
 
