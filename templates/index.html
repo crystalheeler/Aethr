@@ -4175,6 +4175,118 @@
             });
         }
 
+        // Aethr Phase 3 — apply / clear full-bleed map layout via DOM inline
+        // styles. Each style is set with priority 'important' so it beats
+        // any CSS rule, regardless of cascade order, lazy-loaded mode CSS,
+        // or browser cache. Called from switchMode() on every mode change.
+        //
+        // Per-mode config: which DOM elements to find and which styles to
+        // apply. The 'clear' phase removes every property name we ever set
+        // so leaving the mode restores the original layout cleanly.
+        const AETHR_FULL_BLEED = {
+            radiosonde: {
+                hide: [
+                    '.main-content > .sidebar',
+                    '.output-panel > .output-header',
+                    '.output-panel > .status-bar',
+                    '.output-panel > .sidebar-expand-handle',
+                    '.header-right .active-mode-indicator',
+                    '.header-right .version-badge',
+                ],
+                styles: [
+                    {
+                        sel: '.main-content',
+                        props: { 'grid-template-columns': '1fr' },
+                    },
+                    {
+                        sel: '.output-panel',
+                        props: { 'padding': '0', 'background': 'transparent', 'overflow': 'visible' },
+                    },
+                    {
+                        sel: '#radiosondeVisuals',
+                        props: {
+                            'position': 'fixed',
+                            'top': '96px',
+                            'left': '0',
+                            'right': '0',
+                            'bottom': '0',
+                            'margin': '0',
+                            'padding': '0',
+                            'z-index': '50',
+                            'display': 'flex',
+                            'flex-direction': 'column',
+                            'background': '#0a0d12',
+                        },
+                    },
+                    {
+                        sel: '#radiosondeMapContainer',
+                        props: {
+                            'flex': '1 1 auto',
+                            'min-height': '0',
+                            'width': '100%',
+                            'border': '0',
+                            'border-radius': '0',
+                            'background': 'transparent',
+                        },
+                    },
+                    {
+                        sel: '.radiosonde-strip',
+                        props: {
+                            'background': 'transparent',
+                            'border': '0',
+                            'border-radius': '0',
+                            'padding': '4px 12px',
+                            'margin': '0',
+                            'flex-shrink': '0',
+                        },
+                    },
+                ],
+            },
+        };
+
+        // The full property allowlist — every style name any mode config
+        // could set. Used by clearAethrFullBleed() to wipe styles on mode
+        // exit without having to track which mode was previously active.
+        const AETHR_FULL_BLEED_PROPS = [
+            'display', 'position', 'top', 'left', 'right', 'bottom',
+            'width', 'height', 'margin', 'padding', 'z-index',
+            'flex', 'flex-direction', 'flex-shrink', 'min-height',
+            'background', 'border', 'border-radius',
+            'grid-template-columns', 'overflow',
+        ];
+
+        function applyAethrFullBleed(mode) {
+            // First, wipe any previously-applied full-bleed styles. We don't
+            // know what the previous mode was, so clear every selector any
+            // config might have touched.
+            const allSelectors = new Set();
+            Object.values(AETHR_FULL_BLEED).forEach(cfg => {
+                cfg.hide.forEach(s => allSelectors.add(s));
+                cfg.styles.forEach(({ sel }) => allSelectors.add(sel));
+            });
+            allSelectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => {
+                    AETHR_FULL_BLEED_PROPS.forEach(p => el.style.removeProperty(p));
+                });
+            });
+
+            // Then apply the config for the new mode, if any.
+            const cfg = AETHR_FULL_BLEED[mode];
+            if (!cfg) return;
+            cfg.hide.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                });
+            });
+            cfg.styles.forEach(({ sel, props }) => {
+                document.querySelectorAll(sel).forEach(el => {
+                    Object.entries(props).forEach(([name, value]) => {
+                        el.style.setProperty(name, value, 'important');
+                    });
+                });
+            });
+        }
+
         if (!window._keyboardActivationBound) {
             window._keyboardActivationBound = true;
             document.addEventListener('keydown', (event) => {
@@ -5022,19 +5134,22 @@
             const modeMeta = modeCatalog[mode] || {};
             setActiveModeIndicator(modeMeta.indicator || mode.toUpperCase());
 
-            // Aethr Phase 3 — toggle the .ae-fullbleed-mode body class for
-            // modes that should render as full-bleed map dashboards inside
-            // the SPA shell. The class activates rules in
-            // static/css/aethr-fullbleed-modes.css that hide the left
-            // sidebar / expand the content column / tidy the right cluster
-            // and apply mode-specific full-bleed layouts.
+            // Aethr Phase 3 — full-bleed mode layout via inline styles.
             //
-            // Allowlist grows as each mode is migrated. Currently:
-            //   radiosonde — Phase 3A (this commit)
-            //   aprs       — Phase 3B
-            //   drone      — Phase 3C
-            //   aircraft   — Phase 3 fold-in (own mode container)
-            //   vessels    — Phase 3 fold-in
+            // Previously this was done via a body class + external CSS file
+            // (static/css/aethr-fullbleed-modes.css). After enough rounds of
+            // the external CSS appearing not to apply (mix of cache, cascade
+            // order, possibly per-mode CSS loaded later via the lazy mode
+            // loader), we switched to direct inline styles via
+            // element.style.setProperty(..., 'important') — that's the
+            // highest cascade priority short of !important inline `style`
+            // HTML attribute, which is exactly what setProperty('important')
+            // writes. No CSS file, no cache, no specificity fight.
+            //
+            // Allowlist grows as each mode is migrated.
+            applyAethrFullBleed(mode);
+            // Also keep the body class for any future CSS that wants it (e.g.
+            // mode-specific overlays that don't conflict with layout).
             const aeFullBleedModes = new Set(['radiosonde']);
             document.body.classList.toggle('ae-fullbleed-mode', aeFullBleedModes.has(mode));
             const wifiLayoutContainer = document.getElementById('wifiLayoutContainer');
