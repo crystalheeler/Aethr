@@ -108,7 +108,8 @@ body.ae-fullbleed-mode #radiosondeVisuals {
   z-index: 50 !important;
   display: flex !important;
   flex-direction: column !important;
-  background: var(--bg-primary, #0a0d12) !important;
+  background: rgba(255, 0, 255, 0.35) !important;  /* DIAGNOSTIC: magenta = the container itself */
+  outline: 4px solid lime !important;                /* DIAGNOSTIC: lime outline = container boundary */
 }
 
 /* DIAGNOSTIC v2 — visualize each child of #radiosondeVisuals with a
